@@ -16,9 +16,10 @@ namespace sia
         {
             constexpr auto comp = overload {
                 [] <typename T>                 (T  arg1, T  arg2) constexpr noexcept -> bool { return arg1 == arg2; },
-                [] <typename T1, typename T2>   (T1 arg1, T2 arg2) constexpr noexcept -> bool { return false; }
+                [] <typename T1, typename T2>   (T1 arg1, T2 arg2) constexpr noexcept -> bool { return false; },
+                [] <typename T>                 (T arg)            constexpr noexcept -> bool { return false; }
             };
-            constexpr auto run = [comp] (auto arg) constexpr noexcept -> bool {return (comp(Ds, arg) || ...);};
+            constexpr auto run = [comp] (auto arg) constexpr noexcept -> bool {return (comp(arg, Ds) || ...);};
             return (run(args) || ...);
         }
     };
