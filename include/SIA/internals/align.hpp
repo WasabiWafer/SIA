@@ -8,15 +8,28 @@ namespace sia
 {
     namespace align_detail
     {
-        template <size_t Size>
-        constexpr auto calc_max_size_type() noexcept
+        struct align_info
         {
-            if constexpr (std::is_same_v<void, unsigned_interger_t<Size>>)
-            { return calc_max_size_type<Size * 2>(); }
-            else { return unsigned_interger_t<Size/2>{ }; }
+            size_t max;
+            size_t min;
+        };
+
+        template <auto E>
+        constexpr size_t max() noexcept
+        {
+            return E;
+        }
+        
+        template <auto E0, auto E1, auto... Es>
+        constexpr size_t max() noexcept
+        {
+            if constexpr (E0 >= E1)
+            { return max<E0, Es...>(); }
+            else { return max<E1, Es...>(); }
         }
     } // namespace align_detail
     
-    constexpr size_t align_max = alignof(align_detail::calc_max_size_type<1>());
-
+    template <typename... Ts>
+    constexpr size_t max_align = align_detail::max<alignof(Ts)...>();
+    constexpr align_detail::align_info align_info {alignof(largest_size_t), alignof(smallest_size_t)};
 } // namespace sia

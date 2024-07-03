@@ -30,9 +30,7 @@ namespace sia
     struct memory_manager
     {
         using page_t = memory_manager_detail::memory_page<PageSize, BlockSize>;
-
         constexpr memory_manager() : memory {InitSize} { }
-
         std::vector<page_t> memory;
     };
 } // namespace sia

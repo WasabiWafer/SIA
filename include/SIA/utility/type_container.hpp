@@ -95,14 +95,13 @@ namespace sia
             return gen_ret(list_t{ });
         }
 
-        // Cs == remove list (type pair)
-        template <typename... Cs, size_t... Seq>
-        constexpr auto remove_impl(std::index_sequence<Seq...>) noexcept
+        template <typename... Cs>
+        constexpr auto remove_impl() noexcept
         {
-            constexpr auto filter_flag = [] <typename T> () { return is_same_any_v<T, Cs...>; };
+            constexpr auto target_cond = [] <typename T> () { return is_same_any_v<T, Cs...>; };
             type_container copy{ };
-            constexpr size_t run_count = copy.size() - copy.count_if<0, copy.size(), filter_flag>();
-            return shrink<filter_flag, run_count>();
+            constexpr size_t run_count = copy.size() - copy.count_if<0, copy.size(), target_cond>();
+            return shrink<target_cond, run_count>();
         }
 
     public:
@@ -127,17 +126,8 @@ namespace sia
         }
         
         template <typename... Cs>
-        constexpr auto remove() noexcept
-        {
-            using seq = std::make_index_sequence<sizeof...(Ts)>;
-            return remove_impl<Cs...>(seq{ });
-        }
-
+        constexpr auto remove() noexcept { return remove_impl<Cs...>(); }
         template <size_t... Idxs>
-        constexpr auto remove() noexcept
-        {
-            using seq = std::make_index_sequence<sizeof...(Ts)>;
-            return remove_impl<decltype(this->at<Idxs>())...>(seq{ });
-        }
+        constexpr auto remove() noexcept { return remove_impl<decltype(this->at<Idxs>())...>(); }
     };
 } // namespace sia
