@@ -24,6 +24,8 @@ namespace sia
 
     template <typename T, typename... Ts>
     struct is_same_any : public std::bool_constant<(std::is_same_v<T, Ts> || ...)> { };
+    template <typename T>
+    struct is_same_any<T> : public std::true_type { };
     template <typename T, typename... Ts>
     constexpr const bool is_same_any_v = is_same_any<T, Ts...>::value;
 

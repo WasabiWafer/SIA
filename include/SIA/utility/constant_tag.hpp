@@ -6,18 +6,16 @@
 
 namespace sia
 {
-    template <auto... Ds>
-        requires (std::is_scoped_enum_v<decltype(Ds)> && ...)
+    template <auto... Ds> requires (std::is_scoped_enum_v<decltype(Ds)> && ...)
     struct constant_tag
     {
-        template <typename... Ts>
-            requires (std::is_scoped_enum_v<Ts> && ...)
+        template <typename... Ts> requires (std::is_scoped_enum_v<Ts> && ...)
         [[nodiscard]] constexpr bool query(Ts... args) noexcept
         {
             constexpr auto comp = overload {
-                [] <typename T>                 (T  arg1, T  arg2) constexpr noexcept -> bool { return arg1 == arg2; },
+                [] <typename T>                 (T  arg)           constexpr noexcept -> bool { return false; },
                 [] <typename T1, typename T2>   (T1 arg1, T2 arg2) constexpr noexcept -> bool { return false; },
-                [] <typename T>                 (T arg)            constexpr noexcept -> bool { return false; }
+                [] <typename T>                 (T  arg1, T  arg2) constexpr noexcept -> bool { return arg1 == arg2; }
             };
             constexpr auto run = [comp] (auto arg) constexpr noexcept -> bool {return (comp(arg, Ds) || ...);};
             return (run(args) || ...);
