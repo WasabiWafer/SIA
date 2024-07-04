@@ -9,6 +9,11 @@
 #include "SIA/internals/types.hpp"
 #include "SIA/container/tuple.hpp"
 
+//  TO DO
+//  fix - amiguous page info update/bug
+//  add - merge used memory functionality
+//  add - make choose allocate policy
+
 namespace sia
 {
     template <size_t, size_t, size_t, typename, size_t>
@@ -139,13 +144,13 @@ namespace sia
             constexpr void update_usable_info(const size_t req, const size_t rem) noexcept
             {
                 bool is_same_infomation = (pinfo.able_min_size == pinfo.able_max_size);
-                bool is_max_last = (pinfo.able_max_size_count == 1);
                 bool is_min_last = (pinfo.able_max_size_count == 1);
+                bool is_max_last = (pinfo.able_max_size_count == 1);
                 bool is_need_update = ((pinfo.able_max_size < req) || (pinfo.able_min_size > req));
 
                 if (is_same_infomation)
                 {
-                    if (is_min_last || is_max_last)
+                    if (is_min_last)
                     {
                         if (is_need_update)
                         {
@@ -153,6 +158,12 @@ namespace sia
                             pinfo.able_max_size = req;
                             pinfo.able_min_size_count = 1;
                             pinfo.able_max_size_count = 1;
+                        }
+                        else
+                        {
+                            update_usable_info_min(req);
+                            update_usable_info_max(req);
+                            update_usable_info_fixer();
                         }
                     }
                     else if (is_need_update)
