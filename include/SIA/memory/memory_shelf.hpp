@@ -1,16 +1,17 @@
 #pragma once
 
+#include <type_traits>
 #include <array>
 #include <vector>
 #include <bit>
 #include <limits>
 #include <cmath>
+#include <algorithm>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/container/tuple.hpp"
 
 //  TO DO
-//  add - merge used memory functionality
 //  add - make choose allocate policy
 
 // tools
@@ -18,7 +19,8 @@ namespace sia
 {
     namespace memory_shelf_tools
     {
-        // add concept
+        template <typename T>
+        concept Allocatable = (!std::is_const_v<T>) && (!std::is_function_v<T>) && (!std::is_reference_v<T>) && (!std::is_void_v<T>);
     } // namespace memory_shelf_tools
 } // namespace sia
 
@@ -56,7 +58,7 @@ namespace sia
         constexpr word_t& operator[](const size_t pos) noexcept { return words[pos]; }
 
         constexpr size_t fittable_size(const size_t byte_size) noexcept
-        { return std::ceil(static_cast<double>(byte_size)/static_cast<double>(LetterSize)); }
+        { return static_cast<size_t>(std::ceil(static_cast<double>(byte_size)/static_cast<double>(LetterSize))); }
 
         constexpr size_t addr_pos(LetterType* ptr) noexcept
         {
@@ -70,7 +72,20 @@ namespace sia
             { return ret/LetterSize; }
         }
 
-        constexpr void update_page_info() noexcept
+        constexpr void recover() noexcept
+        {
+            using used_t = memory_page_detail::used_info;
+            auto cond = [=] (const used_t& arg) { return ((arg.pos + arg.able_letter) == pinfo.writable_pos); };
+            const auto iter = std::find_if(pinfo.used_log.begin(), pinfo.used_log.end(), cond);
+            if (!(iter == pinfo.used_log.end()))
+            {
+                pinfo.writable_pos = iter->pos;
+                pinfo.writable_letter += iter->able_letter;
+                pinfo.used_log.erase(iter);
+            }
+        }
+
+        constexpr void update_page() noexcept
         {
             size_t min {std::numeric_limits<size_t>::max()};
             size_t min_count { };
@@ -102,7 +117,7 @@ namespace sia
         constexpr void update_usable(const size_t req_letter, const size_t rem_letter) noexcept
         {
             if (rem_letter != 0)
-            { update_refusal(rem_letter); }
+            { update_release(rem_letter); }
 
             bool is_same_point = (pinfo.able_min_letter == pinfo.able_max_letter);
             bool hit_min = (pinfo.able_min_letter == (req_letter + rem_letter));
@@ -133,7 +148,7 @@ namespace sia
                 if (is_min_last || is_max_last)
                 {
                     if (hit_min || hit_max)
-                    { update_page_info(); }
+                    { update_page(); }
                 }
                 else
                 {
@@ -150,18 +165,15 @@ namespace sia
             const size_t remain_letter = used_iter->able_letter - req_letter;
             if(remain_letter != 0)
             {
-                size_t new_pos = used_iter->pos + req_letter;
-                used_iter->pos = new_pos;
+                used_iter->pos = used_iter->pos + req_letter;
                 used_iter->able_letter = remain_letter;
             }
             else
-            {
-                pinfo.used_log.erase(used_iter);
-            }
+            { pinfo.used_log.erase(used_iter); }
             update_usable(req_letter, remain_letter);
         }
 
-        constexpr void update_refusal(const size_t letter_size) noexcept
+        constexpr void update_release(const size_t letter_size) noexcept
         {
             bool is_empty = ((pinfo.able_min_letter == 0) && (pinfo.able_max_letter == 0));
             bool is_same_point = (pinfo.able_min_letter == pinfo.able_max_letter);
@@ -252,6 +264,33 @@ namespace sia
         constexpr word_t* begin() noexcept { return &(words[0]); }
         constexpr word_t* end() noexcept { return &(words[WordNum]); }
 
+        constexpr void restore() noexcept
+        {
+            using used_t = memory_page_detail::used_info;
+            constexpr auto comp_g = [] (const used_t& arg0, const used_t& arg1) { return arg0.pos < arg1.pos; };
+            std::sort(pinfo.used_log.begin(), pinfo.used_log.end(), comp_g);
+            for (auto top_iter{pinfo.used_log.begin()}; top_iter < pinfo.used_log.end(); ++top_iter)
+            {
+                for (auto cat_iter{top_iter + 1}; cat_iter < pinfo.used_log.end(); ++cat_iter)
+                {
+                    bool catable = ((top_iter->pos + top_iter->able_letter) == cat_iter->pos);
+                    if (catable)
+                    {
+                        cat_iter->pos = top_iter->pos;
+                        cat_iter->able_letter += top_iter->able_letter;
+                        top_iter->able_letter = 0;
+                        top_iter = cat_iter;
+                    }
+                    else
+                    { break; }
+                }
+            }
+            constexpr auto cond_del = [] (const used_t& arg) { return arg.able_letter == 0; };
+            std::erase_if(pinfo.used_log, cond_del);
+            recover();
+            update_page();
+        }
+
         constexpr tuple<bool, LetterType*> request(const size_t byte_size) noexcept
         {
             tuple<bool, LetterType*> ret{usable(byte_size)};
@@ -260,10 +299,10 @@ namespace sia
             else { return ret; }
         }
 
-        constexpr void refusal(LetterType* ptr, const size_t byte_size) noexcept
+        constexpr void release(LetterType* ptr, const size_t byte_size) noexcept
         {
             const size_t letter_size = fittable_size(byte_size);
-            update_refusal(letter_size);
+            update_release(letter_size);
             pinfo.used_log.emplace_back(addr_pos(ptr), letter_size);
         }
     };
@@ -312,13 +351,13 @@ namespace sia
         constexpr page_t& operator[](const size_t pos) noexcept { return pages[pos]; }
 
     public:
-        constexpr bool refusal(LetterType* ptr, const size_t byte_size) noexcept
+        constexpr bool release(LetterType* ptr, const size_t byte_size) noexcept
         {
             if (binfo.begin != pages[0].begin())
             { update_book_info(); }
             if (binfo.begin <= ptr && ptr < binfo.end)
             {
-                pages[addr_pos(ptr)].refusal(ptr, byte_size);
+                pages[addr_pos(ptr)].release(ptr, byte_size);
                 return true;
             }
             return false;
@@ -331,14 +370,20 @@ namespace sia
                 tuple<bool, LetterType*> result = book_iter->request(byte_size);
                 if (result.at<0>() == true)
                 { return result.at<1>(); }
-                // { return &((*book_iter)[result.at<1>()]); }
             }
             return nullptr;
+        }
+
+        constexpr void restore(const size_t pos) noexcept { pages[pos].restore(); }
+        constexpr void restore() noexcept
+        {
+            for (auto& elem : pages)
+            { elem.restore(); }
         }
     };
 } // namespace sia
 
-
+// memory_shelf
 namespace sia
 {
     namespace memory_shelf_detail
@@ -346,7 +391,15 @@ namespace sia
         
     } // namespace memory_shelf_detail
 
-    template <size_t PageNum, size_t WordNum, typename LetterType = unsigned_interger_t<1>, size_t LetterSize = sizeof(LetterType)>
+    namespace memory_shelf_policy
+    {
+        enum class policy { basic, fit, seq };
+        // basic >> used - writable
+        // fit >> find best fit
+        // 
+    } // namespace memory_shelf_policy
+
+    template <size_t PageNum, size_t WordNum, memory_shelf_tools::Allocatable LetterType = unsigned_interger_t<1>, size_t LetterSize = sizeof(LetterType)>
     struct memory_shelf
     {
     private:
@@ -356,7 +409,7 @@ namespace sia
 
     public:
         template <typename C>
-        constexpr C* allocate(const size_t& size = 1) noexcept
+        [[nodiscard]] constexpr C* allocate(const size_t& size = 1) noexcept
         {
             if (size == 0) { return nullptr; }
             if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
@@ -373,15 +426,24 @@ namespace sia
         }
 
         template <typename C>
-        constexpr void deallocate(C* ptr, const size_t size = 1) noexcept
+        constexpr bool deallocate(C* ptr, const size_t size = 1) noexcept
         {
             LetterType* conv_ptr = std::bit_cast<LetterType*>(ptr);
-            if((ptr == nullptr) || (size == 0)) { return ; }
+            if((ptr == nullptr) || (size == 0)) { return false; }
             for (auto shelf_iter {books.begin()}; shelf_iter < books.end(); ++shelf_iter)
             {
-                if (shelf_iter->refusal(conv_ptr, sizeof(C) * size))
-                { return; }
+                if (shelf_iter->release(conv_ptr, sizeof(C) * size))
+                { return true; }
             }
+            return false;
+        }
+
+        constexpr void restore(const size_t pos0, const size_t pos1) noexcept { books[pos0].restore(pos1); }
+        constexpr void restore(const size_t pos0) noexcept { books[pos0].restore(); }
+        constexpr void restore() noexcept
+        {
+            for (auto& elem : books)
+            { elem.restore(); }
         }
     };
 } // namespace sia
