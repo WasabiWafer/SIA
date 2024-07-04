@@ -48,12 +48,12 @@ namespace sia
     template <size_t WordNum, typename LetterType, size_t LetterSize>
     struct memory_page
     {
-        private:
-
+    private:
         using word_t = LetterType;
-        
         memory_page_detail::page_info pinfo;
         std::array<word_t, WordNum> words;
+
+        constexpr word_t& operator[](const size_t pos) noexcept { return words[pos]; }
 
         constexpr size_t fittable_size(const size_t byte_size) noexcept
         { return std::ceil(static_cast<double>(byte_size)/static_cast<double>(LetterSize)); }
@@ -167,8 +167,8 @@ namespace sia
             bool is_same_point = (pinfo.able_min_letter == pinfo.able_max_letter);
             bool need_max_update = (letter_size > pinfo.able_max_letter);
             bool need_min_update = (letter_size < pinfo.able_min_letter);
-            bool hit_max_count = (letter_size == pinfo.able_max_letter);
-            bool hit_min_count = (letter_size == pinfo.able_max_letter);
+            bool hit_max = (letter_size == pinfo.able_max_letter);
+            bool hit_min = (letter_size == pinfo.able_max_letter);
 
             if (is_empty)
             {
@@ -179,7 +179,7 @@ namespace sia
             }
             else if (is_same_point)
             {
-                if (hit_min_count || hit_max_count)
+                if (hit_min || hit_max)
                 {
                     ++pinfo.able_min_count;
                     ++pinfo.able_max_count;
@@ -197,7 +197,7 @@ namespace sia
             }
             else
             {
-                if (hit_min_count)
+                if (hit_min)
                 {
                     ++pinfo.able_min_count;
                 }
@@ -206,7 +206,7 @@ namespace sia
                     pinfo.able_min_letter = letter_size;
                     pinfo.able_min_count = 1;
                 }
-                else if (hit_max_count)
+                else if (hit_max)
                 {
                     ++pinfo.able_max_count;
                 }
@@ -218,40 +218,43 @@ namespace sia
             }
         }
 
-        constexpr tuple<bool, size_t> writable(const size_t byte_size) noexcept
+        constexpr tuple<bool, LetterType*> writable(const size_t byte_size) noexcept
         {
             if(pinfo.writable_pos == 0) { pinfo.writable_letter = WordNum; }
-            size_t ret{ };
+            size_t pos{ };
             const size_t req_letter_num = fittable_size(byte_size);
-            if (pinfo.writable_letter < req_letter_num) { return {false, ret}; }
+            if (pinfo.writable_letter < req_letter_num) { return {false, nullptr}; }
             else
             {
-                ret = pinfo.writable_pos;
+                pos = pinfo.writable_pos;
                 pinfo.writable_pos += req_letter_num;
                 pinfo.writable_letter -= req_letter_num;
-                return {true, ret};
+                return {true, &(words[pos])};
             }
         }
 
-        constexpr tuple<bool, size_t> usable(const size_t byte_size)
+        constexpr tuple<bool, LetterType*> usable(const size_t byte_size)
         {
             const size_t req_letter = fittable_size(byte_size);
             for (auto used_iter {pinfo.used_log.begin()}; used_iter < pinfo.used_log.end(); ++used_iter)
             {
                 if (used_iter->able_letter >= req_letter)
                 {
-                    size_t ret {used_iter->pos};
+                    size_t pos {used_iter->pos};
                     update_used(used_iter, req_letter);
-                    return {true, ret};
+                    return {true, &(words[pos])};
                 }
             }
-            return {false, 0};
+            return {false, nullptr};
         }
 
-        public:
-        constexpr tuple<bool, size_t> request(const size_t byte_size) noexcept
+    public:
+        constexpr word_t* begin() noexcept { return &(words[0]); }
+        constexpr word_t* end() noexcept { return &(words[WordNum]); }
+
+        constexpr tuple<bool, LetterType*> request(const size_t byte_size) noexcept
         {
-            tuple<bool, size_t> ret{usable(byte_size)};
+            tuple<bool, LetterType*> ret{usable(byte_size)};
             if (ret.at<0>() == false)
             { return writable(byte_size); }
             else { return ret; }
@@ -263,8 +266,6 @@ namespace sia
             update_refusal(letter_size);
             pinfo.used_log.emplace_back(addr_pos(ptr), letter_size);
         }
-
-        constexpr word_t& operator[](const size_t pos) noexcept { return words[pos]; }
     };
 } // namespace sia
 
@@ -284,10 +285,8 @@ namespace sia
     template <size_t PageNum, size_t WordNum, typename LetterType, size_t LetterSize>
     struct memory_book
     {
-        private:
-
+    private:
         using page_t = memory_page<WordNum, LetterType, LetterSize>;
-
         memory_book_detail::book_info<LetterType> binfo;
         std::array<page_t, PageNum> pages;
 
@@ -304,20 +303,19 @@ namespace sia
             { return ret/page_size; }
         }
 
-        constexpr void update_info() noexcept
+        constexpr void update_book_info() noexcept
         {
-            binfo.begin = &(pages[0][0]);
-            binfo.end = &(pages[PageNum-1][WordNum]);
+            binfo.begin = pages[0].begin();
+            binfo.end = pages[PageNum-1].end();
         }
 
         constexpr page_t& operator[](const size_t pos) noexcept { return pages[pos]; }
 
-        public:
-
+    public:
         constexpr bool refusal(LetterType* ptr, const size_t byte_size) noexcept
         {
-            if (binfo.begin != &(pages[0][0]))
-            { update_info(); }
+            if (binfo.begin != pages[0].begin())
+            { update_book_info(); }
             if (binfo.begin <= ptr && ptr < binfo.end)
             {
                 pages[addr_pos(ptr)].refusal(ptr, byte_size);
@@ -330,9 +328,10 @@ namespace sia
         {
             for (auto book_iter {pages.begin()}; book_iter < pages.end(); ++book_iter)
             {
-                tuple<bool, size_t> result = book_iter->request(byte_size);
+                tuple<bool, LetterType*> result = book_iter->request(byte_size);
                 if (result.at<0>() == true)
-                { return &((*book_iter)[result.at<1>()]); }
+                { return result.at<1>(); }
+                // { return &((*book_iter)[result.at<1>()]); }
             }
             return nullptr;
         }
@@ -352,25 +351,25 @@ namespace sia
     {
     private:
         using book_t = memory_book<PageNum, WordNum, LetterType, LetterSize>;
-
         std::vector<book_t> books;
-
         constexpr book_t& operator[](const size_t pos) noexcept { return books[pos]; }
 
     public:
-
         template <typename C>
         constexpr C* allocate(const size_t& size = 1) noexcept
         {
             if (size == 0) { return nullptr; }
             if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
             size_t req_byte_size = sizeof(C) * size;
+            LetterType* ptr{ };
             for (auto shelf_iter {books.begin()}; shelf_iter < books.end(); ++shelf_iter)
             {
-                LetterType* ptr = shelf_iter->request(req_byte_size);
+                ptr = shelf_iter->request(req_byte_size);
                 return std::bit_cast<C*>(ptr);
             }
-            return nullptr;
+            books.emplace_back();
+            ptr = books.back().request(req_byte_size);
+            return std::bit_cast<C*>(ptr);
         }
 
         template <typename C>
