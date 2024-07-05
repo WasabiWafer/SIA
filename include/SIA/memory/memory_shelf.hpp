@@ -313,7 +313,6 @@ namespace sia
             {
                 restore();
                 return usable(byte_size);
-                
             }
             else { return {false, nullptr}; }
         }

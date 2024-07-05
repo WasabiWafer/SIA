@@ -14,11 +14,14 @@ namespace sia
     struct type_pair
     {
     public:
-        constexpr auto key() noexcept { return Key; }
-        constexpr auto contain() noexcept { return T{ }; }
+        using container_t = T;
+        constexpr size_t key() noexcept { return Key; }
+        constexpr T contain() noexcept { return T{ }; }
     protected:
+        template <size_t N>
+        using hash_t = decltype(std::declval<type_pair>().hash<Key>());
         template <size_t N> requires (Key == N)
-        constexpr auto hash() noexcept { return *this; }
+        constexpr type_pair hash() noexcept { return type_pair{ }; }
     };
 } // namespace sia
 
@@ -46,9 +49,9 @@ namespace sia
     private:
         using base_t = type_sequence_detail::type_sequence_impl<std::make_index_sequence<sizeof...(Ts)>, Ts...>;
     public:
-        constexpr auto size() noexcept { return sizeof...(Ts); }
+        constexpr size_t size() noexcept { return sizeof...(Ts); }
         template <size_t Idx> requires (Idx < sizeof...(Ts))
-        constexpr auto at() noexcept { return this->base_t::select_base_t<Idx>::hash<Idx>(); }
+        constexpr auto at() noexcept { return base_t::select_base_t<Idx>::template hash<Idx>(); }
     };
 } // namespace sia
 
@@ -67,11 +70,12 @@ namespace sia
     struct type_container : public type_sequence<Ts...>
     {
     private:
+        using base_t = type_sequence<Ts...>;
         template <size_t Hit, size_t Pos, auto Callable>
         constexpr auto shrink_impl() noexcept
         {
-            using pos_type = decltype(this->at<Pos>());
-            using ret_type = decltype(this->at<Pos>().contain());
+            using pos_type = decltype(base_t::template at<Pos>());
+            using ret_type = decltype(base_t::template at<Pos>().contain());
             constexpr bool flag = Callable.operator()<pos_type>();
             if constexpr (Hit == 0)
             {
@@ -105,13 +109,13 @@ namespace sia
         }
 
     public:
-        template <typename... Ts1> constexpr auto insert() noexcept { return type_container<Ts..., Ts1...>{ }; }
-        template <typename... Ts1> using insert_t = type_container<Ts..., Ts1...>;
+        template <typename... Cs> using insert_t = type_container<Ts..., Cs...>;
+        template <typename... Cs> constexpr insert_t<Cs...> insert() noexcept { return type_container<Ts..., Cs...>{ }; }
 
         template <size_t Begin, size_t End, auto Callable>
         constexpr size_t count_if(size_t count = 0) noexcept
         {
-            using pos_type = decltype(this->at<Begin>());
+            using pos_type = decltype(base_t::template at<Begin>());
             constexpr bool flag = Callable.operator()<pos_type>();
             if constexpr (Begin + 1 >= End)
             {
@@ -120,14 +124,14 @@ namespace sia
             }
             else
             {
-                if constexpr (flag) { return count_if<Begin + 1, End, Callable>(count + 1); }
-                else                { return count_if<Begin + 1, End, Callable>(count); }
+                if constexpr (flag) { return type_container::template count_if<Begin + 1, End, Callable>(count + 1); }
+                else                { return type_container::template count_if<Begin + 1, End, Callable>(count); }
             }
         }
         
         template <typename... Cs>
         constexpr auto remove() noexcept { return remove_impl<Cs...>(); }
         template <size_t... Idxs>
-        constexpr auto remove() noexcept { return remove_impl<decltype(this->at<Idxs>())...>(); }
+        constexpr auto remove() noexcept { return remove_impl<decltype(base_t::template at<Idxs>())...>(); }
     };
 } // namespace sia
