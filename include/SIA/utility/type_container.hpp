@@ -5,7 +5,6 @@
 
 #include "SIA/internals/types.hpp"
 #include "SIA/utility/tools.hpp"
-#include "SIA/memory/constant_allocator.hpp"
 
 //type_pair
 namespace sia
@@ -40,7 +39,7 @@ namespace sia
         {
         private:
             template <size_t Idx> using select_base_t = decltype(std::declval<overload<type_pair<Seq, Ts>...>>().hash<Idx>());
-        };    
+        };
     } // namespace type_sequence_detail
 
     template <typename... Ts>
@@ -52,6 +51,8 @@ namespace sia
         constexpr size_t size() noexcept { return sizeof...(Ts); }
         template <size_t Idx> requires (Idx < sizeof...(Ts))
         constexpr auto at() noexcept { return base_t::select_base_t<Idx>::template hash<Idx>(); }
+        template <size_t Idx> requires (Idx >= sizeof...(Ts))
+        constexpr auto at() noexcept { return nullptr; }
     };
 } // namespace sia
 
@@ -108,13 +109,20 @@ namespace sia
             return shrink<target_cond, run_count>();
         }
 
+        template <typename... Cs> requires (sizeof...(Ts) == 0)
+        constexpr auto remove_impl() noexcept
+        {
+            return type_container{ };
+        }
+
     public:
         template <typename... Cs> using insert_t = type_container<Ts..., Cs...>;
         template <typename... Cs> constexpr insert_t<Cs...> insert() noexcept { return type_container<Ts..., Cs...>{ }; }
 
         template <size_t Begin, size_t End, auto Callable>
-        constexpr size_t count_if(size_t count = 0) noexcept
+        constexpr size_t count_if(const size_t count = 0) noexcept
         {
+            
             using pos_type = decltype(base_t::template at<Begin>());
             constexpr bool flag = Callable.operator()<pos_type>();
             if constexpr (Begin + 1 >= End)
@@ -127,6 +135,12 @@ namespace sia
                 if constexpr (flag) { return type_container::template count_if<Begin + 1, End, Callable>(count + 1); }
                 else                { return type_container::template count_if<Begin + 1, End, Callable>(count); }
             }
+        }
+
+        template <size_t Begin, size_t End, auto Callable>
+        constexpr void for_each() noexcept
+        {
+            
         }
         
         template <typename... Cs>

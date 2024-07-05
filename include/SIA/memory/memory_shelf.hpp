@@ -61,6 +61,31 @@ namespace sia
         constexpr size_t fittable_size(const size_t byte_size) noexcept
         { return static_cast<size_t>(std::ceil(static_cast<double>(byte_size)/static_cast<double>(LetterSize))); }
 
+        constexpr void recycle() noexcept
+        {   
+            using used_t = memory_page_detail::used_info;
+            constexpr auto comp_g = [] (const used_t& arg0, const used_t& arg1) { return arg0.pos < arg1.pos; };
+            std::sort(pinfo.used_log.begin(), pinfo.used_log.end(), comp_g);
+            for (auto top_iter{pinfo.used_log.begin()}; top_iter < pinfo.used_log.end(); ++top_iter)
+            {
+                for (auto cat_iter{top_iter + 1}; cat_iter < pinfo.used_log.end(); ++cat_iter)
+                {
+                    bool catable = ((top_iter->pos + top_iter->able_letter) == cat_iter->pos);
+                    if (catable)
+                    {
+                        cat_iter->pos = top_iter->pos;
+                        cat_iter->able_letter += top_iter->able_letter;
+                        top_iter->able_letter = 0;
+                        top_iter = cat_iter;
+                    }
+                    else
+                    { break; }
+                }
+            }
+            constexpr auto cond_del = [] (const used_t& arg) { return arg.able_letter == 0; };
+            std::erase_if(pinfo.used_log, cond_del);
+        }
+
         constexpr void recover() noexcept
         {
             using used_t = memory_page_detail::used_info;
@@ -268,27 +293,7 @@ namespace sia
 
         constexpr void restore() noexcept
         {
-            using used_t = memory_page_detail::used_info;
-            constexpr auto comp_g = [] (const used_t& arg0, const used_t& arg1) { return arg0.pos < arg1.pos; };
-            std::sort(pinfo.used_log.begin(), pinfo.used_log.end(), comp_g);
-            for (auto top_iter{pinfo.used_log.begin()}; top_iter < pinfo.used_log.end(); ++top_iter)
-            {
-                for (auto cat_iter{top_iter + 1}; cat_iter < pinfo.used_log.end(); ++cat_iter)
-                {
-                    bool catable = ((top_iter->pos + top_iter->able_letter) == cat_iter->pos);
-                    if (catable)
-                    {
-                        cat_iter->pos = top_iter->pos;
-                        cat_iter->able_letter += top_iter->able_letter;
-                        top_iter->able_letter = 0;
-                        top_iter = cat_iter;
-                    }
-                    else
-                    { break; }
-                }
-            }
-            constexpr auto cond_del = [] (const used_t& arg) { return arg.able_letter == 0; };
-            std::erase_if(pinfo.used_log, cond_del);
+            recycle();
             recover();
             update_page();
         }
@@ -311,8 +316,11 @@ namespace sia
             }
             else if (policy == memory_shelf_policy::policy::thrifty)
             {
-                restore();
-                return usable(byte_size);
+                recycle();
+                auto ret = usable(byte_size);
+                recover();
+                update_page();
+                return ret;
             }
             else { return {false, nullptr}; }
         }

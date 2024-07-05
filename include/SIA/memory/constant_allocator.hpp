@@ -14,7 +14,6 @@ namespace sia
     private:
         using base_t = constant_allocator_detail::make_data_t<Data>;
     public:
-        constexpr auto self() noexcept { return constant_allocator{ }; }
         constexpr auto alloc() noexcept { return base_t::operator()(); }
         constexpr auto callable() noexcept { return base_t{ }; }
     };
