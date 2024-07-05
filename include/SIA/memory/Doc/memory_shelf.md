@@ -1,6 +1,6 @@
 ```cpp
 sia::memory_shelf<4, 512> ms { };
-//<PageNum, WordNum, WordType(default unsigned char), WorTypeSize(default 1)>
+//<PageNum, WordNum, WordType(default unsigned char), WorTypeSize(default sizeof(WordType))>
 
 ms.assign(1);
 // assign vector
