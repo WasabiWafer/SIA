@@ -31,7 +31,7 @@ ms.restore();
 
 sia::memory_shelf_policy::policy::none;
 // use default allocation process.
-// try use deallocated memory -> try use sequential memory -> return nullptr.
+// try use deallocated memory -> try use sequential memory
 sia::memory_shelf_policy::policy::poor;
 // try allocate only use deallocated memory.
 sia::memory_shelf_policy::policy::rich;
