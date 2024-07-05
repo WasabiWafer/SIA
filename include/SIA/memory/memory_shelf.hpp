@@ -11,9 +11,6 @@
 #include "SIA/internals/types.hpp"
 #include "SIA/container/tuple.hpp"
 
-//  TO DO
-//  add - make choose allocate policy
-
 // tools
 namespace sia
 {
@@ -22,6 +19,12 @@ namespace sia
         template <typename T>
         concept Allocatable = (!std::is_const_v<T>) && (!std::is_function_v<T>) && (!std::is_reference_v<T>) && (!std::is_void_v<T>);
     } // namespace memory_shelf_tools
+
+    namespace memory_shelf_policy
+    {
+        enum class policy { none, rich, poor, thrifty };
+    } // namespace memory_shelf_policy
+    
 } // namespace sia
 
 // memory_page
@@ -55,22 +58,8 @@ namespace sia
         memory_page_detail::page_info pinfo;
         std::array<word_t, WordNum> words;
 
-        constexpr word_t& operator[](const size_t pos) noexcept { return words[pos]; }
-
         constexpr size_t fittable_size(const size_t byte_size) noexcept
         { return static_cast<size_t>(std::ceil(static_cast<double>(byte_size)/static_cast<double>(LetterSize))); }
-
-        constexpr size_t addr_pos(LetterType* ptr) noexcept
-        {
-            constexpr auto minus = [] (const size_t arg0, const size_t arg1) { return (arg0 >= arg1) ? arg0 - arg1 : arg1 - arg0; };
-            const size_t conv_begin = reinterpret_cast<size_t>(&(words[0]));
-            const size_t conv_ptr = reinterpret_cast<size_t>(ptr);
-            const size_t ret = minus(conv_begin, conv_ptr);
-            if (ret == 0)
-            { return ret; }
-            else
-            { return ret/LetterSize; }
-        }
 
         constexpr void recover() noexcept
         {
@@ -261,8 +250,21 @@ namespace sia
         }
 
     public:
+        constexpr word_t& operator[](const size_t pos) noexcept { return words[pos]; }
         constexpr word_t* begin() noexcept { return &(words[0]); }
         constexpr word_t* end() noexcept { return &(words[WordNum]); }
+
+        constexpr size_t addr_pos(LetterType* ptr) noexcept
+        {
+            constexpr auto minus = [] (const size_t arg0, const size_t arg1) { return (arg0 >= arg1) ? arg0 - arg1 : arg1 - arg0; };
+            const size_t conv_begin = reinterpret_cast<size_t>(&(words[0]));
+            const size_t conv_ptr = reinterpret_cast<size_t>(ptr);
+            const size_t ret = minus(conv_begin, conv_ptr);
+            if (ret == 0)
+            { return ret; }
+            else
+            { return ret/LetterSize; }
+        }
 
         constexpr void restore() noexcept
         {
@@ -291,12 +293,29 @@ namespace sia
             update_page();
         }
 
-        constexpr tuple<bool, LetterType*> request(const size_t byte_size) noexcept
+        constexpr tuple<bool, LetterType*> request(const size_t byte_size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
         {
-            tuple<bool, LetterType*> ret{usable(byte_size)};
-            if (ret.at<0>() == false)
-            { return writable(byte_size); }
-            else { return ret; }
+            if (policy == memory_shelf_policy::policy::none)
+            {
+                tuple<bool, LetterType*> ret = usable(byte_size);
+                if (ret.at<0>() == false) { return writable(byte_size); }
+                else { return ret; }
+            }
+            else if (policy == memory_shelf_policy::policy::rich)
+            {
+                return writable(byte_size);
+            }
+            else if (policy == memory_shelf_policy::policy::poor)
+            {
+                return usable(byte_size);
+            }
+            else if (policy == memory_shelf_policy::policy::thrifty)
+            {
+                restore();
+                return usable(byte_size);
+                
+            }
+            else { return {false, nullptr}; }
         }
 
         constexpr void release(LetterType* ptr, const size_t byte_size) noexcept
@@ -329,6 +348,16 @@ namespace sia
         memory_book_detail::book_info<LetterType> binfo;
         std::array<page_t, PageNum> pages;
 
+        constexpr void update_book_info() noexcept
+        {
+            binfo.begin = pages[0].begin();
+            binfo.end = pages[PageNum-1].end();
+        }
+
+    public:
+        constexpr page_t& operator[](const size_t pos) noexcept { return pages[pos]; }
+        constexpr bool owned(LetterType* ptr) noexcept { return ((binfo.begin <= ptr) && (ptr < binfo.end)); }
+
         constexpr size_t addr_pos(LetterType* ptr) noexcept
         {
             constexpr size_t page_size = sizeof(page_t);
@@ -342,20 +371,11 @@ namespace sia
             { return ret/page_size; }
         }
 
-        constexpr void update_book_info() noexcept
-        {
-            binfo.begin = pages[0].begin();
-            binfo.end = pages[PageNum-1].end();
-        }
-
-        constexpr page_t& operator[](const size_t pos) noexcept { return pages[pos]; }
-
-    public:
         constexpr bool release(LetterType* ptr, const size_t byte_size) noexcept
         {
             if (binfo.begin != pages[0].begin())
             { update_book_info(); }
-            if (binfo.begin <= ptr && ptr < binfo.end)
+            if (owned(ptr))
             {
                 pages[addr_pos(ptr)].release(ptr, byte_size);
                 return true;
@@ -363,11 +383,19 @@ namespace sia
             return false;
         }
 
-        constexpr LetterType* request(const size_t byte_size) noexcept
+        constexpr LetterType* request(const size_t pos0, const size_t byte_size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        {
+            tuple<bool, LetterType*> result = pages[pos0].request(byte_size, policy);
+            if (result.at<0>() == true)
+            { return result.at<1>(); }
+            return nullptr;
+        }
+
+        constexpr LetterType* request(const size_t byte_size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
         {
             for (auto book_iter {pages.begin()}; book_iter < pages.end(); ++book_iter)
             {
-                tuple<bool, LetterType*> result = book_iter->request(byte_size);
+                tuple<bool, LetterType*> result = book_iter->request(byte_size, policy);
                 if (result.at<0>() == true)
                 { return result.at<1>(); }
             }
@@ -385,20 +413,7 @@ namespace sia
 
 // memory_shelf
 namespace sia
-{
-    namespace memory_shelf_detail
-    {
-        
-    } // namespace memory_shelf_detail
-
-    namespace memory_shelf_policy
-    {
-        enum class policy { basic, fit, seq };
-        // basic >> used - writable
-        // fit >> find best fit
-        // 
-    } // namespace memory_shelf_policy
-
+{    
     template <size_t PageNum, size_t WordNum, memory_shelf_tools::Allocatable LetterType = unsigned_interger_t<1>, size_t LetterSize = sizeof(LetterType)>
     struct memory_shelf
     {
@@ -408,8 +423,54 @@ namespace sia
         constexpr book_t& operator[](const size_t pos) noexcept { return books[pos]; }
 
     public:
+        constexpr size_t word_size() noexcept { return LetterSize; }
+        constexpr size_t page_size() noexcept { return word_size() * WordNum; }
+        constexpr size_t book_size() noexcept { return page_size() * PageNum; }
+        constexpr size_t shelf_size() noexcept { return book_size() * books.capacity(); }
+        constexpr size_t capacity() noexcept { return books.capacity(); }
+        constexpr void assign(const size_t size) { books.assign(size, { }); }
         template <typename C>
-        [[nodiscard]] constexpr C* allocate(const size_t& size = 1) noexcept
+        constexpr tuple<bool, size_t, size_t, size_t> addr_pos(C* ptr) noexcept
+        {
+            LetterType* conv_ptr = std::bit_cast<LetterType*>(ptr);
+            for (size_t pos0{ }; pos0 < capacity(); ++pos0)
+            {
+                if (books[pos0].owned(conv_ptr))
+                {
+                    size_t pos1 = books[pos0].addr_pos(conv_ptr);
+                    size_t pos2 = books[pos0][pos1].addr_pos(conv_ptr);
+                    return {true, pos0, pos1, pos2};
+                }
+            }
+            return {false, 0, 0, 0};
+        }
+
+        template <typename C>
+        [[nodiscard]] constexpr C* allocate(const size_t pos0, const size_t pos1, const size_t& size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        {
+            if (size == 0) { return nullptr; }
+            if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
+            size_t req_byte_size = sizeof(C) * size;
+            LetterType* ptr{ };
+            ptr = books[pos0].request(pos1, req_byte_size);
+            if (ptr == nullptr) { return nullptr; }
+            return std::bit_cast<C*>(ptr);
+        }
+
+        template <typename C>
+        [[nodiscard]] constexpr C* allocate(const size_t pos0, const size_t& size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        {
+            if (size == 0) { return nullptr; }
+            if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
+            size_t req_byte_size = sizeof(C) * size;
+            LetterType* ptr{ };
+            ptr = books[pos0].request(req_byte_size);
+            if (ptr == nullptr) { return nullptr; }
+            return std::bit_cast<C*>(ptr);
+        }
+
+        template <typename C>
+        [[nodiscard]] constexpr C* allocate(const size_t& size = 1, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
         {
             if (size == 0) { return nullptr; }
             if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
@@ -417,12 +478,10 @@ namespace sia
             LetterType* ptr{ };
             for (auto shelf_iter {books.begin()}; shelf_iter < books.end(); ++shelf_iter)
             {
-                ptr = shelf_iter->request(req_byte_size);
+                ptr = shelf_iter->request(req_byte_size, policy);
                 return std::bit_cast<C*>(ptr);
             }
-            books.emplace_back();
-            ptr = books.back().request(req_byte_size);
-            return std::bit_cast<C*>(ptr);
+            return nullptr;
         }
 
         template <typename C>
