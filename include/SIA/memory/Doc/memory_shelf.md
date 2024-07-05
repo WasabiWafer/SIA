@@ -7,19 +7,19 @@ int main()
     ms.assign(1);
     // assign vector
 
-    std::size_t* r0 = ms.allocate<size_t>(1, sia::memory_shelf_policy::policy::none);
+    std::size_t* r0 = ms.allocate<std::size_t>(1, sia::memory_shelf_policy::policy::none);
     // allocate size_t
 
     ms.deallocate(r0, 1);
     // deallocate
 
-    int* r1 = ms.allocate<int>(10);
-    // allocate sizeof(int)*10
-
+    int* r1 = ms.allocate<int>();
     bool cond = ((void*)r0 == (void*)r1);
     // it's true
     // memory_shelf don't modify user's ptr. should care by user.
 
+    r1 = ms.allocate<int>(10);
+    // allocate sizeof(int)*10
     new (r1)(int[10]){0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     // can be use inplacement new initialization.
 
