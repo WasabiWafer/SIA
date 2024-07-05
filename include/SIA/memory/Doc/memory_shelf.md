@@ -26,7 +26,7 @@ cond = ((void*)r0 == (void*)r1);
 // memory_shelf don't automatically reorganization memory use status.
 
 ms.restore();
-// make sequential memory information from used concatable deallocated memory.
+// make sequential memory information from use concatable deallocated memory.
 // and delete deallocated information when it concat.
 
 sia::memory_shelf_policy::policy::none;
