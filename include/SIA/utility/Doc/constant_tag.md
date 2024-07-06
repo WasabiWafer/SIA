@@ -1,3 +1,6 @@
+# Constant Tag
+constant_tag takes multiple template entity enum class and give user functionality query if constant_tag has target enum class.  
+this functionality may help save struct size, help compiler oprimization.
 ```cpp
 struct A
 {

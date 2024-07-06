@@ -1,3 +1,6 @@
+# Constant Allocator  
+simply constant_allocator is constant value helper class.  
+it can pass to argument/parameter and get value as constant/constexpr.
 ```cpp
 template <auto E>
 constexpr int baz()

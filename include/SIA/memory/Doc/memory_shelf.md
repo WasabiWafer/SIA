@@ -3,9 +3,6 @@ memory_shelf is managing allocate and deallocate memory using pre-allocated memo
 it split memory by the size called Word (default unsigned char).  
 the Word collection is called Page and Page collection is called book and collection of book is called memory shelf.  
 comprehensively simply memory_shelf is memory pool.
-
-
-
 ```cpp
 sia::memory_shelf<4, 512> ms { };
 //<PageNum, WordNum, WordType(default unsigned char), WorTypeSize(default sizeof(WordType))>
