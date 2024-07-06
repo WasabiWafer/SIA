@@ -29,6 +29,8 @@ namespace sia
     template <typename T, typename... Ts>
     constexpr const bool is_same_any_v = is_same_any<T, Ts...>::value;
 
-    template <typename... Ts>   struct type_list { };
-    template <auto... Ens>      struct entity_list { };
+    template <typename... Ts>
+    struct type_list { using type = type_list; };
+    template <auto... Es>
+    struct entity_list { using type = entity_list; };
 } // namespace sia
