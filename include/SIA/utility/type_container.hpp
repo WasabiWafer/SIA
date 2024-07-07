@@ -13,7 +13,7 @@ namespace sia
     struct type_pair
     {
     public:
-        using container_t = T;
+        using contain_t = T;
         constexpr size_t key() noexcept { return Key; }
         constexpr T contain() noexcept { return T{ }; }
     protected:
@@ -65,6 +65,9 @@ namespace sia
         struct concat_helper;
         template <typename T, typename... Ts>
         struct concat_helper<T, type_list<Ts...>> { using type = type_list<T, Ts...>; };
+
+        struct type_type { };
+        struct false_type { };
     } // namespace type_container_detail
     
     template <typename... Ts>
@@ -72,80 +75,114 @@ namespace sia
     {
     private:
         using base_t = type_sequence<Ts...>;
-        template <size_t Hit, size_t Pos, auto Callable>
-        constexpr auto shrink_impl() noexcept
-        {
-            using pos_type = decltype(base_t::template at<Pos>());
-            using ret_type = decltype(base_t::template at<Pos>().contain());
-            constexpr bool flag = Callable.operator()<pos_type>();
-            if constexpr (Hit == 0)
-            {
-                if constexpr (flag) { return shrink_impl<Hit, Pos + 1, Callable>(); }
-                else { return type_list<ret_type>{ }; }
-            }
-            else
-            {
-                if constexpr (flag) { return shrink_impl<Hit, Pos + 1, Callable>(); }
-                else { return typename type_container_detail::concat_helper<ret_type, decltype(shrink_impl<Hit - 1, Pos + 1, Callable>())>::type{ }; }
-            }
-        }
-
-        template <typename... Ts>
-        constexpr auto gen_ret(type_list<Ts...>) noexcept { return type_container<Ts...>{ }; }
-        
-        template <auto Callable, size_t Count>
-        constexpr auto shrink() noexcept
-        {
-            using list_t = decltype(shrink_impl<Count - 1, 0, Callable>());
-            return gen_ret(list_t{ });
-        }
 
         template <typename... Cs>
         constexpr auto remove_impl() noexcept
         {
             constexpr auto target_cond = [] <typename T> () { return is_same_any_v<T, Cs...>; };
             type_container copy{ };
-            constexpr size_t run_count = copy.size() - copy.count_if<0, copy.size(), target_cond>();
-            return shrink<target_cond, run_count>();
-        }
+            constexpr size_t run_count = sizeof...(Ts) - copy.count_if<0, sizeof...(Ts), target_cond>();
+            
+            using at_seq_t = std::make_index_sequence<sizeof...(Ts)>;
+            using run_seq_t = std::make_index_sequence<run_count>;
 
-        template <typename... Cs> requires (sizeof...(Ts) == 0)
-        constexpr auto remove_impl() noexcept
-        {
-            return type_container{ };
+            constexpr auto calc_pos =
+            [] <size_t TargetCount, size_t At>
+            (size_t& count, size_t& pos)
+            {
+                using pos_t = decltype(this->base_t::template at<At>());
+                constexpr bool hit = target_cond.operator()<pos_t>();
+                if (TargetCount == count)
+                {
+                    if (hit) { }
+                    else { pos = At; ++count; }
+                }
+                else
+                {
+                    if (hit) { }
+                    else { ++count; }
+                }
+            };
+
+            constexpr auto get_pos =
+            [] <size_t TargetCount, size_t... AtSeq>
+            (std::index_sequence<AtSeq...>)
+            {
+                size_t count{ };
+                size_t pos{ };
+                ((calc_pos.operator()<TargetCount, AtSeq>(count, pos)), ...);
+                return pos;
+            };
+
+            constexpr auto gen_type =
+            [] <size_t TargetCount, size_t... AtSeq>
+            (std::index_sequence<AtSeq...> arg) 
+            {
+                type_container copy{ };
+                return copy.base_t::template at<get_pos.operator()<TargetCount>(arg)>().contain();
+            };
+
+            constexpr auto wrap =
+            [] <size_t... RunSeq, size_t... AtSeq>
+            (std::index_sequence<RunSeq...> arg0, std::index_sequence<AtSeq...> arg1)
+            { return type_container<decltype(gen_type.operator()<RunSeq>(arg1))...>{ }; };
+
+            return wrap(run_seq_t{ }, at_seq_t{ });
         }
 
     public:
         template <typename... Cs> using insert_t = type_container<Ts..., Cs...>;
         template <typename... Cs> constexpr insert_t<Cs...> insert() noexcept { return type_container<Ts..., Cs...>{ }; }
-
-        template <size_t Begin, size_t End, auto Callable>
+        
+        template <size_t Begin, size_t End, auto Callable> requires (Begin < End)
         constexpr size_t count_if(const size_t count = 0) noexcept
-        {
-            
-            using pos_type = decltype(base_t::template at<Begin>());
-            constexpr bool flag = Callable.operator()<pos_type>();
-            if constexpr (Begin + 1 >= End)
+        {   
+            constexpr auto gen_seq = [] <auto... Seq> (std::index_sequence<Seq...>) { return std::index_sequence<(Seq + Begin)...>{ }; };
+            using at_seq_t = decltype(gen_seq(std::make_index_sequence<End - Begin>{ }));
+            constexpr auto calc =
+            [] <size_t Pos>
+            (size_t& count) constexpr noexcept
             {
-                if constexpr (flag) { return count + 1; }
-                else                { return count; }
-            }
-            else
+                using pos_type = decltype(std::declval<type_container>().base_t::template at<Pos>());
+                if (Callable.operator()<pos_type>()) { ++count; }
+            };
+            constexpr auto wrap =
+            [] <auto... Seq>
+            (std::index_sequence<Seq...>)
             {
-                if constexpr (flag) { return type_container::template count_if<Begin + 1, End, Callable>(count + 1); }
-                else                { return type_container::template count_if<Begin + 1, End, Callable>(count); }
-            }
+                size_t count { };
+                ((calc.operator()<Seq>(count)), ...);
+                return count;
+            };
+            return wrap(at_seq_t{ });
         }
 
-        template <size_t Begin, size_t End, auto Callable>
+        template <size_t Begin, size_t End, auto Callable> requires (Begin < End)
         constexpr void for_each() noexcept
         {
-            
+            constexpr auto gen_seq = [] <auto... Seq> (std::index_sequence<Seq...>) { return std::index_sequence<(Seq + Begin)...>{ }; };
+            using at_seq_t = decltype(gen_seq(std::make_index_sequence<End - Begin>{ }));
+            constexpr auto run =
+            [] <size_t At>
+            ()
+            {
+                using pos_t = decltype(std::declval<type_container>().base_t::template at<At>());
+                Callable.operator()<pos_t>();
+            };
+            constexpr auto wrap =
+            [] <size_t... AtSeq>
+            (std::index_sequence<AtSeq...>)
+            {
+                ((run.operator()<AtSeq>()), ...);
+            };
+            wrap(at_seq_t{ });
         }
         
-        template <typename... Cs>
+        template <typename... Cs> requires (sizeof...(Cs) > 0)
         constexpr auto remove() noexcept { return remove_impl<Cs...>(); }
-        template <size_t... Idxs>
+        template <size_t... Idxs> requires (sizeof...(Idxs) > 0)
         constexpr auto remove() noexcept { return remove_impl<decltype(base_t::template at<Idxs>())...>(); }
+        template <typename... Cs> requires (sizeof...(Cs) == 0)
+        constexpr auto remove() noexcept { return type_container{ }; }
     };
 } // namespace sia

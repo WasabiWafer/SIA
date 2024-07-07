@@ -8,7 +8,7 @@ sia::memory_shelf<4, 512> ms { };
 //<PageNum, WordNum, WordType(default unsigned char), WorTypeSize(default sizeof(WordType))>
 
 ms.assign(1); // assign vector
-std::size_t* r0 = ms.allocate<std::size_t>(1, sia::memory_shelf_policy::policy::none); // allocate size_t 1
+std::size_t* r0 = ms.allocate<size_t>(1, sia::memory_shelf_policy::policy::none); // allocate size_t 1
 
 ms.deallocate(r0, 1); // deallocate
 
