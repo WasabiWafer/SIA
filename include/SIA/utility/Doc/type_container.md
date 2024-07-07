@@ -4,6 +4,7 @@ type_container is offer several functionally of manage template type parameter p
 int main()
 {
     constexpr auto lam0 = [] <typename T> () { return std::is_same_v<typename T::contain_t, double>; };
+    // input is type_pair<Key, Type>, type_pair<Key, Type>::contain_t == Type
 
     sia::type_container<char, short, int, float, double, double> tc{ };
     
