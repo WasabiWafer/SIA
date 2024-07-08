@@ -26,4 +26,7 @@ namespace sia
     
     template <typename... Ts>
     struct tuple : public tuple_detail::tuple_impl<std::make_index_sequence<sizeof...(Ts)>, Ts...> { };
+    
+    template <typename... Ts>
+    tuple(Ts...) -> tuple<Ts...>;
 } // namespace sia

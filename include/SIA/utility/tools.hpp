@@ -4,13 +4,13 @@
 
 namespace sia
 {
-    template <class... Cls>
-    struct overload : public Cls...
+    template <typename... Ts>
+    struct overload : public Ts...
     {
-        using Cls::operator()...;
+        using Ts::operator()...;
     };
-    template <class... Cls>
-    overload(Cls...) -> overload<Cls...>;
+    template <typename... Ts>
+    overload(Ts...) -> overload<Ts...>;
 
     template <auto Data>
     constexpr const auto& make_static() noexcept { return Data; };
