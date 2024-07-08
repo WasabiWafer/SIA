@@ -59,17 +59,6 @@ namespace sia
 //type_container
 namespace sia
 {
-    namespace type_container_detail
-    {
-        template <typename... Ts>
-        struct concat_helper;
-        template <typename T, typename... Ts>
-        struct concat_helper<T, type_list<Ts...>> { using type = type_list<T, Ts...>; };
-
-        struct type_type { };
-        struct false_type { };
-    } // namespace type_container_detail
-    
     template <typename... Ts>
     struct type_container : public type_sequence<Ts...>
     {
