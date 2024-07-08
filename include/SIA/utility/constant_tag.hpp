@@ -10,7 +10,7 @@ namespace sia
     struct constant_tag
     {
         template <typename... Ts> requires (std::is_scoped_enum_v<Ts> && ...)
-        [[nodiscard]] constexpr bool query(Ts... args) noexcept
+        [[nodiscard]] constexpr bool query(this auto&& self, Ts... args) noexcept
         {
             constexpr auto comp = overload {
                 [] <typename T>                 (T  arg)           constexpr noexcept -> bool { return false; },

@@ -20,7 +20,7 @@ namespace sia
         {
             using tycon = type_container<tuple_data<Seq, Ts>...>;
             template <size_t Pos>
-            constexpr auto& at() noexcept { return decltype(std::declval<tycon>().at<Pos>().contain())::data; }
+            constexpr auto& at(this auto&& self) noexcept { return self.decltype(std::declval<tycon>().at<Pos>().contain())::data; }
         };
     } // namespace tuple_detail
     

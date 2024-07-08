@@ -13,7 +13,7 @@ namespace sia
     overload(Ts...) -> overload<Ts...>;
 
     template <auto Data>
-    constexpr const auto& make_static() noexcept { return Data; };
+    constexpr const auto& make_static() noexcept { return Data; }
 
     template <typename T, typename... Ts>
     struct is_same_all : public std::bool_constant<(std::is_same_v<T, Ts> && ...)> { };

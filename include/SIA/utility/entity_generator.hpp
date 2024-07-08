@@ -48,8 +48,8 @@ namespace sia
         using domain_t = entity_list<Es...>;
     public:
         template <auto... Ds>
-        constexpr auto bind(entity_list<Ds...> arg) { return monadic<Functor, decltype(entity_generator_detail::generate_range<Functor>(arg))>{ }; }
-        constexpr auto bind() noexcept { return monadic<Functor, decltype(entity_generator_detail::generate_range<Functor>(domain_t{ }))>{ }; }
-        constexpr auto result() noexcept { return domain_t{ }; }
+        constexpr auto bind(this auto&& self, entity_list<Ds...> arg) { return monadic<Functor, decltype(entity_generator_detail::generate_range<Functor>(arg))>{ }; }
+        constexpr auto bind(this auto&& self) noexcept { return monadic<Functor, decltype(entity_generator_detail::generate_range<Functor>(domain_t{ }))>{ }; }
+        constexpr auto result(this auto&& self) noexcept { return domain_t{ }; }
     };
 } // namespace sia
