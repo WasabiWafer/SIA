@@ -147,7 +147,7 @@ namespace sia
             constexpr auto run =
             [] <size_t At> () constexpr noexcept
             {
-                using pos_t = decltype(std::declval<type_container>().base_t::template at<At>());
+                using pos_t = decltype(self.type_container::base_t::template at<Pos>());
                 Callable.operator()<pos_t>();
             };
             constexpr auto wrap = [] <size_t... AtSeq> (std::index_sequence<AtSeq...>) constexpr noexcept { ((run.operator()<AtSeq>()), ...); };

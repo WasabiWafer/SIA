@@ -4,7 +4,7 @@
 
 namespace sia
 {
-    namespace window_flag
+    namespace windows_tag
     {
         namespace window_message
         {
@@ -375,5 +375,5 @@ namespace sia
                 window_edge             = WS_EX_WINDOWEDGE
             };
         } // namespace window_style_ex
-    } // namespace window_flag
+    } // namespace windows_tag
 } // namespace sia

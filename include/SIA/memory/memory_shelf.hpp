@@ -20,10 +20,10 @@ namespace sia
         concept Allocatable = (!std::is_const_v<T>) && (!std::is_function_v<T>) && (!std::is_reference_v<T>) && (!std::is_void_v<T>);
     } // namespace memory_shelf_tools
 
-    namespace memory_shelf_policy
+    namespace memory_shelf_tag
     {
         enum class policy { none, rich, poor, thrifty };
-    } // namespace memory_shelf_policy
+    } // namespace memory_shelf_tag
     
 } // namespace sia
 
@@ -298,23 +298,23 @@ namespace sia
             update_page();
         }
 
-        constexpr tuple<bool, LetterType*> request(const size_t byte_size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        constexpr tuple<bool, LetterType*> request(const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
         {
-            if (policy == memory_shelf_policy::policy::none)
+            if (policy == memory_shelf_tag::policy::none)
             {
                 tuple<bool, LetterType*> ret = usable(byte_size);
                 if (ret.at<0>() == false) { return writable(byte_size); }
                 else { return ret; }
             }
-            else if (policy == memory_shelf_policy::policy::rich)
+            else if (policy == memory_shelf_tag::policy::rich)
             {
                 return writable(byte_size);
             }
-            else if (policy == memory_shelf_policy::policy::poor)
+            else if (policy == memory_shelf_tag::policy::poor)
             {
                 return usable(byte_size);
             }
-            else if (policy == memory_shelf_policy::policy::thrifty)
+            else if (policy == memory_shelf_tag::policy::thrifty)
             {
                 recycle();
                 auto ret = usable(byte_size);
@@ -390,7 +390,7 @@ namespace sia
             return false;
         }
 
-        constexpr LetterType* request(const size_t pos0, const size_t byte_size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        constexpr LetterType* request(const size_t pos0, const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
         {
             tuple<bool, LetterType*> result = pages[pos0].request(byte_size, policy);
             if (result.at<0>() == true)
@@ -398,7 +398,7 @@ namespace sia
             return nullptr;
         }
 
-        constexpr LetterType* request(const size_t byte_size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        constexpr LetterType* request(const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
         {
             for (auto book_iter {pages.begin()}; book_iter < pages.end(); ++book_iter)
             {
@@ -453,7 +453,7 @@ namespace sia
         }
 
         template <typename C>
-        [[nodiscard]] constexpr C* allocate(const size_t pos0, const size_t pos1, const size_t& size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        [[nodiscard]] constexpr C* allocate(const size_t pos0, const size_t pos1, const size_t& size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
         {
             if (size == 0) { return nullptr; }
             if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
@@ -465,7 +465,7 @@ namespace sia
         }
 
         template <typename C>
-        [[nodiscard]] constexpr C* allocate(const size_t pos0, const size_t& size, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        [[nodiscard]] constexpr C* allocate(const size_t pos0, const size_t& size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
         {
             if (size == 0) { return nullptr; }
             if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
@@ -477,7 +477,7 @@ namespace sia
         }
 
         template <typename C>
-        [[nodiscard]] constexpr C* allocate(const size_t& size = 1, const memory_shelf_policy::policy policy = memory_shelf_policy::policy::none) noexcept
+        [[nodiscard]] constexpr C* allocate(const size_t& size = 1, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
         {
             if (size == 0) { return nullptr; }
             if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
