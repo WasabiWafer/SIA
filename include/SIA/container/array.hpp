@@ -1,7 +1,8 @@
 #pragma once
 
-#include <bit>
 #include <type_traits>
+
+#include "SIA/internals/types.hpp"
 
 namespace sia
 {
@@ -23,7 +24,9 @@ namespace sia
         constexpr T* end    (this auto&& self)  noexcept    { return self.arr + N; }
         constexpr T& front  (this auto&& self)  noexcept    { return self.arr[0]; }
         constexpr T& back   (this auto&& self)  noexcept    { return self.arr[N-1]; }
+
         constexpr size_t size(this auto&& self) noexcept    { return N; }
+        
         constexpr T& operator[](this auto&& self, const size_t pos) noexcept { return self.arr[pos]; }
     };
 

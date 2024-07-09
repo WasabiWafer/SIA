@@ -160,7 +160,5 @@ namespace sia
         constexpr auto remove(this auto&& self) noexcept { return self.remove_impl<decltype(self.base_t::template at<Idxs>())...>(); }
         template <typename... Cs> requires (sizeof...(Cs) == 0)
         constexpr auto remove(this auto&& self) noexcept { return type_container{ }; }
-
-        // std::remove_reference_t<decltype(self)>::
     };
 } // namespace sia
