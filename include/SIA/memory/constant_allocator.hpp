@@ -16,6 +16,5 @@ namespace sia
     public:
         constexpr auto alloc(this auto&& self) noexcept { return self.base_t::operator()(); }
         constexpr auto callable(this auto&& self) noexcept { return constant_allocator::base_t{ }; }
-        // constexpr const auto& ref(this auto&& self) noexcept { return E; };
     };
 }   //  namespace sia
