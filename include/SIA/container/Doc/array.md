@@ -7,12 +7,14 @@ int main()
 {
     constexpr sia::array arr0 {"hello, sia::array!"};
     // initialize arr0 ['h' 'e' 'l' 'l' 'o' ',' ' ' 's' 'i' 'a' ':' ':' 'a' 'r' 'r' 'a' 'y' '!']
-    std::array test0{1,2,3,4,5};
+    sia::array test0{1,2,3,4,5};
     // array<const int, 5>
     sia::array test1{test0, test0};
     // array<array<const int, 5>, 2>
     sia::array test2{test1, test1};
     // array<array<array<const int, 5>, 2>, 2>
+    auto& last_elem = test2.at(test2.size()-1);
+    // at function
     static constexpr sia::array test3{"hello, world !\n", "hello, world !\n", "hello, world !\n", "hello, world !\n", "hello, world !\n"};
     // sia::array<sia::array<const char, 16>, 5>
     constexpr std::string_view sv {test3.begin(), test3.size()};

@@ -28,20 +28,20 @@ namespace sia
         constexpr T* end    (this auto&& self)  noexcept    { return self.elem + N; }
         constexpr T& front  (this auto&& self)  noexcept    { return self.elem[0]; }
         constexpr T& back   (this auto&& self)  noexcept    { return self.elem[N-1]; }
+        constexpr T& at     (this auto&& self, const size_t pos)    noexcept { return self.elem[pos]; }
         constexpr T& operator[](this auto&& self, const size_t pos) noexcept { return self.elem[pos]; }
-
         constexpr size_t size(this auto&& self) noexcept    { return N; }
     };
     template <typename T, size_t N0, size_t N1>
     struct array<array<T, N0>, N1>
     {
         array<T, N0> elem[N1];
-        constexpr T* begin  (this auto&& self)  noexcept    { return self.elem[0].begin(); }
-        constexpr T* end    (this auto&& self)  noexcept    { return self.elem[N1-1].end(); }
-        constexpr T& front  (this auto&& self)  noexcept    { return self.elem[0].front(); }
-        constexpr T& back   (this auto&& self)  noexcept    { return self.elem[N1-1].back(); }
-        constexpr T& operator[](this auto&& self, const size_t pos) noexcept { return self.elem[pos]; }
-
+        constexpr auto* begin  (this auto&& self)  noexcept    { return self.elem[0].begin(); }
+        constexpr auto* end    (this auto&& self)  noexcept    { return self.elem[N1-1].end(); }
+        constexpr auto& front  (this auto&& self)  noexcept    { return self.elem[0].front(); }
+        constexpr auto& back   (this auto&& self)  noexcept    { return self.elem[N1-1].back(); }
+        constexpr auto& at     (this auto&& self, const size_t pos)     noexcept { return self.elem->at(pos); }
+        constexpr auto& operator[](this auto&& self, const size_t pos)  noexcept { return self.elem[pos]; }
         constexpr size_t size(this auto&& self) noexcept
         {
             size_t ret{ };
