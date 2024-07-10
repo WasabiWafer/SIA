@@ -71,7 +71,6 @@ namespace sia
             const std::unique_ptr<Tuple_t> ptr(static_cast<Tuple_t*>(a_tuple));
             Tuple_t& tupl = *ptr.get();
             std::invoke(std::move(tupl.at<Ats>())...);
-            _Cnd_do_broadcast_at_thread_exit();
             return 0;
         }
 
