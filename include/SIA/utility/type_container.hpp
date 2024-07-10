@@ -15,7 +15,7 @@ namespace sia
     public:
         using contain_t = T;
         constexpr size_t key(this auto&& self) noexcept { return Key; }
-        constexpr T contain(this autoi&& self) noexcept { return T{ }; }
+        constexpr T contain(this auto&& self) noexcept { return T{ }; }
     protected:
         template <size_t N>
         using hash_t = decltype(std::declval<type_pair>().hash<Key>());
@@ -140,14 +140,14 @@ namespace sia
         }
 
         template <size_t Begin, size_t End, auto Callable> requires (Begin < End)
-        constexpr void for_each() noexcept
+        constexpr void for_each(this auto&& self) noexcept
         {
             constexpr auto gen_seq = [] <auto... Seq> (std::index_sequence<Seq...>) { return std::index_sequence<(Seq + Begin)...>{ }; };
             using at_seq_t = decltype(gen_seq(std::make_index_sequence<End - Begin>{ }));
             constexpr auto run =
             [] <size_t At> () constexpr noexcept
             {
-                using pos_t = decltype(self.type_container::base_t::template at<Pos>());
+                using pos_t = decltype(self.type_container::base_t::template at<At>());
                 Callable.operator()<pos_t>();
             };
             constexpr auto wrap = [] <size_t... AtSeq> (std::index_sequence<AtSeq...>) constexpr noexcept { ((run.operator()<AtSeq>()), ...); };

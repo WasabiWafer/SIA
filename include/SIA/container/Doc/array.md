@@ -20,7 +20,7 @@ int main()
     constexpr std::string_view sv {test3.begin(), test3.size()};
     // sv == "hello, world !\n\0hello, world !\n\0hello, world !\n\0hello, world !\n\0hello, world !\n\0"
     std::print("{}", sv);
-    // print "hello, world !"" 5 lines
+    // print "hello, world !" 5 lines
     return 0;
 }
 ```

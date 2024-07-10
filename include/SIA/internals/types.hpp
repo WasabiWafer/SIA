@@ -32,11 +32,11 @@ namespace sia
         consteval auto get_unsigned_integer_type() noexcept
         {
             if      constexpr (Size == sizeof(smallest_unsigned_integer_t)) { return smallest_unsigned_integer_t{ }; }
-            else if constexpr (Size == sizeof(char))                        { using ret_t = char;           return ret_t{ }; }
-            else if constexpr (Size == sizeof(short int))                   { using ret_t = short int;      return ret_t{ }; }
-            else if constexpr (Size == sizeof(int))                         { using ret_t = int;            return ret_t{ }; }
-            else if constexpr (Size == sizeof(long int))                    { using ret_t = long int;       return ret_t{ }; }
-            else if constexpr (Size == sizeof(long long int))               { using ret_t = long long int;  return ret_t{ }; }
+            else if constexpr (Size == sizeof(unsigned char))               { using ret_t = unsigned char;           return ret_t{ }; }
+            else if constexpr (Size == sizeof(unsigned short int))          { using ret_t = unsigned short int;      return ret_t{ }; }
+            else if constexpr (Size == sizeof(unsigned int))                { using ret_t = unsigned int;            return ret_t{ }; }
+            else if constexpr (Size == sizeof(unsigned long int))           { using ret_t = unsigned long int;       return ret_t{ }; }
+            else if constexpr (Size == sizeof(unsigned long long int))      { using ret_t = unsigned long long int;  return ret_t{ }; }
             else if constexpr (Size == sizeof(largest_unsigned_integer_t))  { return largest_unsigned_integer_t{ }; }
             else { return nullptr; }
         }
@@ -72,10 +72,10 @@ namespace sia
     template <size_t Size> using signed_interger_t   = decltype(types_detail::get_integer_type<Size>());
     template <size_t Size> using unsigned_interger_t = decltype(types_detail::get_unsigned_integer_type<Size>());
     template <size_t Size> using floating_point_t    = decltype(types_detail::get_floating_type<Size>());
-    using largest_size_t = decltype(types_detail::comp_leeq_ret_large<largest_integer_t, largest_floating_point_t>());
-    using smallest_size_t = decltype(types_detail::comp_leeq_ret_small<smallest_integer_t, smallest_floating_point_t>());
-    using word_t = unsigned_interger_t<2>;
-    using dword_t = unsigned_interger_t<4>;
-    using qword_t = unsigned_interger_t<8>;
+    using largest_size_t    = decltype(types_detail::comp_leeq_ret_large<largest_integer_t, largest_floating_point_t>());
+    using smallest_size_t   = decltype(types_detail::comp_leeq_ret_small<smallest_integer_t, smallest_floating_point_t>());
+    using word_t    = unsigned_interger_t<2>;
+    using dword_t   = unsigned_interger_t<4>;
+    using qword_t   = unsigned_interger_t<8>;
 } // namespace sia
 

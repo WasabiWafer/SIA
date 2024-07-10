@@ -276,8 +276,8 @@ namespace sia
 
     public:
         constexpr word_t& operator[](const size_t pos) noexcept { return words[pos]; }
-        constexpr word_t* begin() noexcept { return &(words[0]); }
-        constexpr word_t* end() noexcept { return &(words[WordNum]); }
+        constexpr word_t* begin() noexcept { return words; }
+        constexpr word_t* end() noexcept { return words + WordNum; }
 
         constexpr size_t addr_pos(LetterType* ptr) noexcept
         {
@@ -436,6 +436,7 @@ namespace sia
         constexpr size_t shelf_size() noexcept { return book_size() * books.capacity(); }
         constexpr size_t capacity() noexcept { return books.capacity(); }
         constexpr void assign(const size_t size) { books.assign(size, { }); }
+        
         template <typename C>
         constexpr tuple<bool, size_t, size_t, size_t> addr_pos(C* ptr) noexcept
         {
