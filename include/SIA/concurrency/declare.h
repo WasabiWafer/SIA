@@ -3,7 +3,9 @@
 #include "SIA/internals/types.hpp"
 #include "SIA/internals/tags.hpp"
 
-#define empty_function(func_name) template<typename...Ts> constexpr auto func_name(Ts...) noexcept { }
+#define empty_struct(struct_name)                       struct struct_name{ };
+#define empty_type_function(func_name, return_type)     template<typename...Ts> constexpr return_type func_name(Ts...) noexcept { return return_type{ }; }
+#define empty_pointer_function(func_name)               template<typename...Ts> constexpr auto func_name(Ts...) noexcept { return nullptr; }
 
 #if defined(SIA_OS_WINDOW)
     // doc list
@@ -13,17 +15,17 @@
     #pragma comment(lib, "Kernel32")
     #include "Windows.h"
     //linux functions...
-    empty_function(pthread_create)
+    empty_pointer_function(pthread_create)
 #elif defined(SIA_OS_LINUX)
     // doc list
     //linux include...
     //window functions...
-    empty_function(CreateThread)
-    empty_function(CloseHandle)
-    empty_function(WaitForSingleObjectEx)
-    empty_function(GetCurrentThreadId)
-    empty_function(SuspendThread)
-    empty_function(ResumeThread)
+    empty_pointer_function(CreateThread)
+    empty_pointer_function(SuspendThread)
+    empty_pointer_function(ResumeThread)
+    empty_type_function(CloseHandle, dword_t)
+    empty_type_function(WaitForSingleObjectEx, dword_t)
+    empty_type_function(GetCurrentThreadId, dword_t)
 #endif
 
 namespace sia

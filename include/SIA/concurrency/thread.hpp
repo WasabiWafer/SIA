@@ -29,7 +29,7 @@ namespace sia
             }
             else if (tag_t::query(tags::os::linux))
             {
-                pthread_create(flag, func, args...); // testing
+                handle = pthread_create(flag, func, args...); // testing
             }
             else
             {
