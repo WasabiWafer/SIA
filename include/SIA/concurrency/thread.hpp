@@ -9,26 +9,12 @@
 
 namespace sia
 {
-    namespace thread_detail
-    {
-
-    } // namespace thread_detail
-
     struct thread : private constant_tag<system::os>
     {
+    private:
         using tag_t = constant_tag<system::os>;
-
         void* handle;
         dword_t id;
-        
-        template <typename F, typename... Ts>
-        thread(auto flag, F&& func, Ts&&... args)
-        {
-            init(static_cast<dword_t>(flag), std::forward<F>(func), std::forward<Ts>(args)...);
-        }
-
-        ~thread() { if(joinable()) { terminate(); } }
-
         template <typename F, typename... Ts>
         constexpr void init(dword_t flag, F&& func, Ts&&... args) noexcept
         {
@@ -51,8 +37,63 @@ namespace sia
             }
         }
 
-        constexpr void resume() noexcept { if (!(handle == nullptr)) { ResumeThread(handle); } }
-        constexpr void suspend() noexcept { if (!(handle == nullptr)) { SuspendThread(handle); } }
+    public:
+        constexpr thread() noexcept = default;
+        constexpr thread(const thread&) noexcept = delete;
+        template <typename F, typename... Ts>
+        constexpr thread(auto flag, F&& func, Ts&&... args) noexcept
+        {
+            init(static_cast<dword_t>(flag), std::forward<F>(func), std::forward<Ts>(args)...);
+        }
+        constexpr thread(thread&& arg) noexcept
+        {
+            if (joinable()) { terminate(); }
+            handle = arg.handle;
+            id = arg.id;
+            arg.handle = nullptr;
+            arg.id = 0;
+        }
+        ~thread() { if (joinable()) { terminate(); } }
+
+        constexpr thread& operator=(const thread&) noexcept = delete;
+        constexpr thread& operator=(thread&& arg) noexcept
+        {
+            if (joinable()) { terminate(); }
+            handle = arg.handle;
+            id = arg.id;
+            arg.handle = nullptr;
+            arg.id = 0;
+            return *this;
+        }
+
+        constexpr void resume() noexcept
+        {
+            if (!(handle == nullptr))
+            {
+                if (tag_t::query(tags::os::window))
+                {
+                    ResumeThread(handle);
+                }
+                else if (tag_t::query(tags::os::linux))
+                { }
+                else
+                { }
+            }
+        }
+        constexpr void suspend() noexcept
+        {
+            if (!(handle == nullptr))
+            {
+                if (tag_t::query(tags::os::window))
+                {
+                    SuspendThread(handle);
+                }
+                else if (tag_t::query(tags::os::linux))
+                { }
+                else
+                { }
+            }
+        }
         constexpr bool joinable() noexcept { return id != 0; }
         void join() noexcept
         {
@@ -67,10 +108,6 @@ namespace sia
                         case thread_tag::wait::object_0  :
                             CloseHandle(handle);
                             break;
-                        case thread_tag::wait::completion:
-                        case thread_tag::wait::abandoned :
-                        case thread_tag::wait::failed    :
-                        case thread_tag::wait::timeout   :
                         default:
                             terminate();
                     }

@@ -1,28 +1,29 @@
 #pragma once
 
-#include <print>
-
 #include "SIA/internals/types.hpp"
 #include "SIA/internals/tags.hpp"
+
+#define empty_function(func_name) template<typename...Ts> constexpr auto func_name(Ts...) noexcept { }
 
 #if defined(SIA_OS_WINDOW)
     // doc list
     // https://learn.microsoft.com/en-us/windows/win32/procthread/processes-and-threads
     // https://learn.microsoft.com/en-us/windows/win32/api/_processthreadsapi/
     // window include...
-        #pragma comment(lib, "Kernel32")
+    #pragma comment(lib, "Kernel32")
     #include "Windows.h"
-
     //linux functions...
-    template <typename... Ts> auto pthread_create(Ts...) { };
+    empty_function(pthread_create)
 #elif defined(SIA_OS_LINUX)
     // doc list
     //linux include...
-
-
-
     //window functions...
-    template <typename... Ts> auto CreateThread(Ts...) { };
+    empty_function(CreateThread)
+    empty_function(CloseHandle)
+    empty_function(WaitForSingleObjectEx)
+    empty_function(GetCurrentThreadId)
+    empty_function(SuspendThread)
+    empty_function(ResumeThread)
 #endif
 
 namespace sia
@@ -78,3 +79,5 @@ namespace sia
         constexpr auto get_thread_function(std::index_sequence<Ats...>) noexcept { return &thread_function<Tuple_t, Ats...>; }
     } // namespace thread_detail
 } // namespace sia
+
+#undef empty_function
