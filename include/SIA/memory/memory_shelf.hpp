@@ -7,6 +7,7 @@
 #include <limits>
 #include <cmath>
 #include <algorithm>
+#include <tuple>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/container/tuple.hpp"
@@ -244,7 +245,7 @@ namespace sia
             }
         }
 
-        constexpr tuple<bool, LetterType*> writable(const size_t byte_size) noexcept
+        constexpr std::tuple<bool, LetterType*> writable(const size_t byte_size) noexcept
         {
             if(pinfo.writable_pos == 0) { pinfo.writable_letter = WordNum; }
             size_t pos{ };
@@ -255,11 +256,11 @@ namespace sia
                 pos = pinfo.writable_pos;
                 pinfo.writable_pos += req_letter_num;
                 pinfo.writable_letter -= req_letter_num;
-                return {true, &(words[pos])};
+                return {true, words + pos};
             }
         }
 
-        constexpr tuple<bool, LetterType*> usable(const size_t byte_size)
+        constexpr std::tuple<bool, LetterType*> usable(const size_t byte_size)
         {
             const size_t req_letter = fittable_size(byte_size);
             for (auto used_iter {pinfo.used_log.begin()}; used_iter < pinfo.used_log.end(); ++used_iter)
@@ -298,12 +299,13 @@ namespace sia
             update_page();
         }
 
-        constexpr tuple<bool, LetterType*> request(const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
+        constexpr std::tuple<bool, LetterType*> request(const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
         {
             if (policy == memory_shelf_tag::policy::none)
             {
-                tuple<bool, LetterType*> ret = usable(byte_size);
-                if (ret.at<0>() == false) { return writable(byte_size); }
+                std::tuple<bool, LetterType*> ret = usable(byte_size);
+                // if (ret.at<0>() == false) { return writable(byte_size); }
+                if (std::get<0>(ret) == false) { return writable(byte_size); }
                 else { return ret; }
             }
             else if (policy == memory_shelf_tag::policy::rich)
@@ -392,9 +394,11 @@ namespace sia
 
         constexpr LetterType* request(const size_t pos0, const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
         {
-            tuple<bool, LetterType*> result = pages[pos0].request(byte_size, policy);
-            if (result.at<0>() == true)
-            { return result.at<1>(); }
+            std::tuple<bool, LetterType*> result = pages[pos0].request(byte_size, policy);
+            // if (result.at<0>() == true)
+            // { return result.at<1>(); }
+            if (std::get<0>(result) == true)
+            { return std::get<1>(result); }
             return nullptr;
         }
 
@@ -402,9 +406,11 @@ namespace sia
         {
             for (auto book_iter {pages.begin()}; book_iter < pages.end(); ++book_iter)
             {
-                tuple<bool, LetterType*> result = book_iter->request(byte_size, policy);
-                if (result.at<0>() == true)
-                { return result.at<1>(); }
+                std::tuple<bool, LetterType*> result = book_iter->request(byte_size, policy);
+                // if (result.at<0>() == true)
+                // { return result.at<1>(); }
+                if (std::get<0>(result) == true)
+                { return std::get<1>(result); }
             }
             return nullptr;
         }
@@ -438,7 +444,7 @@ namespace sia
         constexpr void assign(const size_t size) { books.assign(size, { }); }
         
         template <typename C>
-        constexpr tuple<bool, size_t, size_t, size_t> addr_pos(C* ptr) noexcept
+        constexpr std::tuple<bool, size_t, size_t, size_t> addr_pos(C* ptr) noexcept
         {
             LetterType* conv_ptr = std::bit_cast<LetterType*>(ptr);
             for (size_t pos0{ }; pos0 < capacity(); ++pos0)

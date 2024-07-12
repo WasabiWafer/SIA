@@ -17,9 +17,6 @@ namespace sia
             using tycon = type_container<tuple_data<Seq, Ts>...>;
             template <size_t Pos>
             constexpr auto& at(this auto&& self) noexcept { return self.decltype(std::declval<tycon>().at<Pos>().contain())::data; }
-
-            // template <typename... Cs, size_t... Seq>
-            // constexpr tuple_impl(std::index_sequence<Seq...>, Cs&&... args) noexcept : { }
         };
     } // namespace tuple_detail
     
