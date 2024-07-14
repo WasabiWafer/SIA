@@ -1,5 +1,7 @@
 #pragma once
 
+#include <tuple>
+
 #include "SIA/internals/types.hpp"
 #include "SIA/internals/tags.hpp"
 
@@ -69,17 +71,30 @@ namespace sia
     namespace thread_detail
     {
         template <typename Tuple_t, size_t... Ats>
-        dword_t __stdcall thread_function(void* a_tuple) noexcept
+        dword_t __stdcall generic_thread_function(void* a_tuple) noexcept
         {
             const std::unique_ptr<Tuple_t> ptr(static_cast<Tuple_t*>(a_tuple));
             Tuple_t& tupl = *ptr.get();
-            std::invoke(std::move(tupl.at<Ats>())...);
+            std::invoke(std::move(std::get<Ats>(tupl))...);
             return 0;
         }
 
         template <typename Tuple_t, size_t... Ats>
-        constexpr auto get_thread_function(std::index_sequence<Ats...>) noexcept { return &thread_function<Tuple_t, Ats...>; }
+        auto __stdcall generic_function(void* a_tuple) noexcept
+        {
+            const std::unique_ptr<Tuple_t> ptr(static_cast<Tuple_t*>(a_tuple));
+            Tuple_t& tupl = *ptr.get();
+            return std::invoke(std::move(std::get<Ats>(tupl))...);
+        }
+
+        template <typename Tuple_t, size_t... Ats>
+        constexpr auto get_generic_thread_function(std::index_sequence<Ats...>) noexcept { return &generic_thread_function<Tuple_t, Ats...>; }
+
+        template <typename Tuple_t, size_t... Ats>
+        constexpr auto get_generic_function(std::index_sequence<Ats...>) noexcept { return &generic_function<Tuple_t, Ats...>; }
     } // namespace thread_detail
 } // namespace sia
 
-#undef empty_function
+#undef empty_struct
+#undef empty_type_function
+#undef empty_pointer_function

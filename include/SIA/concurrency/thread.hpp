@@ -2,10 +2,10 @@
 
 #include <type_traits>
 #include <memory>
+#include <tuple>
 
 #include "SIA/concurrency/declare.h"
 #include "SIA/utility/constant_tag.hpp"
-#include "SIA/container/tuple.hpp"
 
 namespace sia
 {
@@ -20,9 +20,9 @@ namespace sia
         {
             if (tag_t::query(tags::os::window))
             {
-                using tuple_t = tuple<std::decay_t<F>, std::decay_t<Ts>...>;
+                using tuple_t = std::tuple<std::decay_t<F>, std::decay_t<Ts>...>;
                 auto decay_copy = std::make_unique<tuple_t>(std::forward<std::decay_t<F>>(func), std::forward<Ts>(args)...);
-                LPTHREAD_START_ROUTINE thread_func = reinterpret_cast<LPTHREAD_START_ROUTINE>(thread_detail::get_thread_function<tuple_t>(std::make_index_sequence<sizeof...(Ts) + 1>{ }));
+                LPTHREAD_START_ROUTINE thread_func = reinterpret_cast<LPTHREAD_START_ROUTINE>(thread_detail::get_generic_thread_function<tuple_t>(std::make_index_sequence<sizeof...(Ts) + 1>{ }));
                 handle = CreateThread(NULL, NULL, thread_func, decay_copy.get(), flag, reinterpret_cast<LPDWORD>(&id));
                 if (handle == nullptr) { terminate(); }
                 else { decay_copy.release(); }
