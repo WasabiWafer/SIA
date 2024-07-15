@@ -41,7 +41,7 @@ namespace sia
             #endif
         }
 
-        constexpr unsigned int get_os_bit() noexcept
+        constexpr unsigned long long int get_os_bit() noexcept
         {
             #if defined(__amd64__) || defined(__amd64) || defined(__x86_64__) || defined(__x86_64) || defined(_M_X64) || defined(_M_AMD64)
                 #define SIA_OS_BIT_64

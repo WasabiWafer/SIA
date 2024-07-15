@@ -58,7 +58,17 @@ namespace sia
         {
             for (size_t count{0}, pos{0}; count < func_num; ++count, pos += 2)
             {
-                std::print("Function {} : {}\n", count, std::chrono::duration_cast<Duration_t>(tm[pos + 1] - tm[pos]));
+                if (count == 0)
+                {
+                    std::print("Function {} : {}\n", count, std::chrono::duration_cast<Duration_t>(tm[pos + 1] - tm[pos]));
+                }
+                else
+                {
+                    auto before = std::chrono::duration_cast<Duration_t>(tm[pos-1] - tm[pos-2]);
+                    auto cur = std::chrono::duration_cast<Duration_t>(tm[pos + 1] - tm[pos]);
+                    double percent = (1.0l - static_cast<double>(cur.count())/static_cast<double>(before.count()))*100.0l;
+                    std::print("Function {} : {} ({:.3f} %)\n", count, cur, percent);
+                }
             }
         }
 

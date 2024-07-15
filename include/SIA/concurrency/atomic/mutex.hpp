@@ -1,6 +1,6 @@
 #pragma once
 
-// #include <thread>
+#include <thread>
 #include <atomic>
 
 #include "SIA/internals/tags.hpp"
