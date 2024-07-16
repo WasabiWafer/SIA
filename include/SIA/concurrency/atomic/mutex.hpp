@@ -12,7 +12,9 @@ namespace sia
     struct mutex
     {
         private:
-        std::atomic_flag atf;
+        alignas(std::hardware_destructive_interference_size) std::atomic_flag atf;
+        unsigned_interger_t<1> padding[std::hardware_destructive_interference_size - sizeof(std::atomic_flag)];
+        
 
         mutex(const mutex&) = delete;
         mutex& operator=(const mutex&) = delete;
