@@ -42,11 +42,11 @@ namespace sia
         template <typename T, typename Allocator = std::allocator<T>>
         struct ring : private Allocator
         {
-            size_t capacity;
+            const size_t capacity;
             T* data;
-            explicit ring(size_t size) noexcept : capacity(size), data(this->Allocator::allocate(size)) { }
+            constexpr ring(size_t size) noexcept : capacity(size), data(this->Allocator::allocate(size)) { }
             ~ring() { this->Allocator::deallocate(data, capacity); }
-            T* operator[](size_t pos) noexcept { return data + (pos%capacity); }
+            constexpr T* operator[](size_t pos) noexcept { return data + (pos%capacity); }
         };
 
         template <auto Tag, typename T, typename Allocator>
@@ -63,8 +63,8 @@ namespace sia
             place& operator=(const place&) = delete;
 
         public:
-            place(deque_t* arg, size_t cur) noexcept : que(arg), cursor(cur) { }
-            place() noexcept = default;
+            constexpr place(deque_t* arg, size_t cur) noexcept : que(arg), cursor(cur) { }
+            constexpr place() noexcept = default;
 
             ~place()
             {
@@ -82,13 +82,13 @@ namespace sia
                 }
             }
 
-            T* get() noexcept
+            constexpr T* get() noexcept
             {
                 if (que != nullptr) { return que->operator[](cursor); }
                 return nullptr;
             }
-            void release() noexcept { que = nullptr; }
-            operator bool() { return (que != nullptr); }
+            constexpr void release() noexcept { que = nullptr; }
+            constexpr operator bool() { return (que != nullptr); }
 
         };
     } // namespace concurrency_deque_detail
@@ -114,14 +114,10 @@ namespace sia
             deque(const deque&) = delete;
             deque& operator=(const deque&) = delete;
 
-            bool full(size_t c_push, size_t c_pop) noexcept
-            {
-                if (c_push >= c_pop) { return (c_push - c_pop) == ring.capacity; }
-                else { return (c_pop - c_push) == ring.capacity; }
-            }
-            bool empty(size_t c_push, size_t c_pop) noexcept { return c_push == c_pop; }
+            constexpr bool full(size_t c_push, size_t c_pop) noexcept { return (c_push - c_pop) == ring.capacity; }
+            constexpr bool empty(size_t c_push, size_t c_pop) noexcept { return c_push == c_pop; }
 
-            push_t push() noexcept
+            constexpr push_t push() noexcept
             {
                 size_t c_push = cursor.push.load(std::memory_order_relaxed);
                 if (full(c_push, cursor.cache_pop))
@@ -132,7 +128,7 @@ namespace sia
                 return {this, c_push};
             }
 
-            pop_t pop() noexcept
+            constexpr pop_t pop() noexcept
             {
                 size_t c_pop = cursor.pop.load(std::memory_order_relaxed);
                 if (empty(cursor.cache_push, c_pop))
@@ -144,17 +140,18 @@ namespace sia
             }
 
         public:
-            deque(size_t size) noexcept : cursor(), ring(size) { }
+            constexpr deque(size_t size) noexcept : cursor(), ring(size) { }
+            ~deque() noexcept { while(pop()) { } }
 
-            T* operator[](size_t pos) noexcept { return ring[pos]; }
+            constexpr T* operator[](size_t pos) noexcept { return ring[pos]; }
 
-            size_t capacity() noexcept { return ring.capacity; }
-            size_t size() noexcept { return cursor.push_cursor - cursor.pop_cursor; }
-            bool empty() noexcept { return size() == 0; }
-            bool full() noexcept { return size() == ring.capacity; }
+            constexpr size_t capacity() noexcept { return ring.capacity; }
+            constexpr size_t size() noexcept{ return cursor.push.load(std::memory_order_relaxed) - cursor.pop.load(std::memory_order_relaxed); }
+            constexpr bool empty() noexcept { return size() == 0; }
+            constexpr bool full() noexcept { return size() == ring.capacity; }
             
             template <typename C>
-            bool push(C&& arg) noexcept
+            constexpr bool push(C&& arg) noexcept
             {
                 push_t place = push();
                 if (place)
@@ -166,7 +163,7 @@ namespace sia
             }
 
             template <typename C>
-            bool pop(C&& arg) noexcept
+            constexpr bool pop(C&& arg) noexcept
             {
                 pop_t place = pop();
                 if (place)
@@ -176,7 +173,6 @@ namespace sia
                 }
                 return false;
             }
-
         };
 
         template <typename T, typename Allocator>
@@ -192,17 +188,17 @@ namespace sia
             deque_service& operator=(const deque_service&) = delete;
 
         public:
-            explicit deque_service(deque<T, Allocator>& arg) : que(arg), mtx_push(), mtx_pop() { }
+            constexpr deque_service(deque<T, Allocator>& arg) : que(arg), mtx_push(), mtx_pop() { }
 
             template <typename C>
-            bool push(C&& arg) noexcept
+            constexpr bool push(C&& arg) noexcept
             {
                 std::lock_guard lg{mtx_push};
                 return que.push(std::forward<C>(arg));
             }
 
             template <typename C>
-            bool pop(C&& arg) noexcept
+            constexpr bool pop(C&& arg) noexcept
             {
                 std::lock_guard lg{mtx_pop};
                 return que.pop(std::forward<C>(arg));

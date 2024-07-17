@@ -4,7 +4,6 @@
 #include <array>
 #include <vector>
 #include <bit>
-#include <limits>
 #include <cmath>
 #include <algorithm>
 #include <tuple>
@@ -23,7 +22,7 @@ namespace sia
 
     namespace memory_shelf_tag
     {
-        enum class policy { none, rich, poor, thrifty };
+        enum class policy { seq_reuse, reuse_seq, seq, reuse };
     } // namespace memory_shelf_tag
     
 } // namespace sia
@@ -33,310 +32,170 @@ namespace sia
 {
     namespace memory_page_detail
     {
-        struct used_info
+        struct reuse_info
         {
             size_t pos;
-            size_t able_letter;
+            size_t size;
         };
 
         struct page_info
         {
-            size_t able_min_letter;
-            size_t able_max_letter;
-            size_t able_min_count;
-            size_t able_max_count;
-            size_t writable_pos;
-            size_t writable_letter;
-            std::vector<used_info> used_log;
+            size_t max_size;
+            size_t seq_cursor;
+            std::vector<reuse_info> reinfo;
         };
     } // namespace memory_page_detail
-    
-    template <size_t WordNum, typename LetterType, size_t LetterSize>
+
+    template <size_t WordSize, typename Word_t>
     struct memory_page
     {
     private:
-        using word_t = LetterType;
-        memory_page_detail::page_info pinfo;
-        std::array<word_t, WordNum> words;
+        using policy_t = memory_shelf_tag::policy;
+        using pinfo_t = memory_page_detail::page_info;
 
-        constexpr size_t fittable_size(const size_t byte_size) noexcept
-        { return static_cast<size_t>(std::ceil(static_cast<double>(byte_size)/static_cast<double>(LetterSize))); }
+        pinfo_t pinfo;
+        std::array<Word_t, WordSize> page;
 
-        constexpr void recycle() noexcept
-        {   
-            using used_t = memory_page_detail::used_info;
-            constexpr auto comp_g = [] (const used_t& arg0, const used_t& arg1) { return arg0.pos < arg1.pos; };
-            std::sort(pinfo.used_log.begin(), pinfo.used_log.end(), comp_g);
-            for (auto top_iter{pinfo.used_log.begin()}; top_iter < pinfo.used_log.end(); ++top_iter)
+        constexpr size_t sequence_size() noexcept { return WordSize - pinfo.seq_cursor; }
+        constexpr void gather_reuse_info() noexcept
+        {
+            constexpr auto greater = [] (const memory_page_detail::reuse_info& arg0, const memory_page_detail::reuse_info& arg1) { return arg0.pos < arg1.pos; };
+            std::sort(pinfo.reinfo.begin(), pinfo.reinfo.end(), greater);
+            for (auto reuse_iter = pinfo.reinfo.begin(); reuse_iter < pinfo.reinfo.end(); ++reuse_iter)
             {
-                for (auto cat_iter{top_iter + 1}; cat_iter < pinfo.used_log.end(); ++cat_iter)
+                for (auto inner_iter = ++reuse_iter; inner_iter < pinfo.reinfo.end(); ++inner_iter)
                 {
-                    bool catable = ((top_iter->pos + top_iter->able_letter) == cat_iter->pos);
-                    if (catable)
+                    bool is_concat_able = ((reuse_iter->pos + reuse_iter->size) == inner_iter->pos);
+                    if (is_concat_able)
                     {
-                        cat_iter->pos = top_iter->pos;
-                        cat_iter->able_letter += top_iter->able_letter;
-                        top_iter->able_letter = 0;
-                        top_iter = cat_iter;
+                        inner_iter->pos = reuse_iter->pos;
+                        inner_iter->size += reuse_iter->size;
+                        reuse_iter->size = 0;
+                        reuse_iter = inner_iter;
                     }
-                    else
-                    { break; }
-                }
+                }   
             }
-            constexpr auto cond_del = [] (const used_t& arg) { return arg.able_letter == 0; };
-            std::erase_if(pinfo.used_log, cond_del);
-        }
-
-        constexpr void recover() noexcept
-        {
-            using used_t = memory_page_detail::used_info;
-            auto cond = [=] (const used_t& arg) { return ((arg.pos + arg.able_letter) == pinfo.writable_pos); };
-            const auto iter = std::find_if(pinfo.used_log.begin(), pinfo.used_log.end(), cond);
-            if (!(iter == pinfo.used_log.end()))
+            constexpr auto eraser = [] (const memory_page_detail::reuse_info& arg) { return arg.size == 0; };
+            std::erase_if(pinfo.reinfo, eraser);
+            auto re_writable = [&] (const memory_page_detail::reuse_info& arg) { return (arg.pos + arg.size) == pinfo.seq_cursor; };
+            auto rewrite_iter = std::find_if(pinfo.reinfo.begin(), pinfo.reinfo.end(), re_writable);
+            if (rewrite_iter != pinfo.reinfo.end())
             {
-                pinfo.writable_pos = iter->pos;
-                pinfo.writable_letter += iter->able_letter;
-                pinfo.used_log.erase(iter);
+                pinfo.seq_cursor = rewrite_iter->pos;
+                pinfo.reinfo.erase(rewrite_iter);
             }
         }
-
-        constexpr void update_page() noexcept
+        constexpr void update_sequence_alloc(size_t size) noexcept { pinfo.seq_cursor += size; }
+        constexpr void update_info_max() noexcept
         {
-            size_t min {std::numeric_limits<size_t>::max()};
-            size_t min_count { };
-            size_t max { };
-            size_t max_count { };
-            for (auto& elem : pinfo.used_log)
+            constexpr auto comp = [] (const memory_page_detail::reuse_info& arg0, const memory_page_detail::reuse_info& arg1) { return arg0.size < arg1.size; };
+            auto iter = std::max_element(pinfo.reinfo.begin(), pinfo.reinfo.end(), comp);
+            if (iter != pinfo.reinfo.end())
             {
-                if (elem.able_letter < min)
-                {
-                    min = elem.able_letter;
-                    min_count = 0;
-                }
-                if (elem.able_letter < max)
-                {
-                    max = elem.able_letter;
-                    max_count = 0;
-                }
-                if (elem.able_letter == min)
-                { ++min_count; }
-                if (elem.able_letter == max)
-                { ++max_count; }
-            }
-            pinfo.able_min_letter = ((min != std::numeric_limits<size_t>::max()) ? min : 0);
-            pinfo.able_max_letter = max;
-            pinfo.able_min_count = min_count;
-            pinfo.able_max_count = max_count;
-        }
-
-        constexpr void update_usable(const size_t req_letter, const size_t rem_letter) noexcept
-        {
-            if (rem_letter != 0)
-            { update_release(rem_letter); }
-
-            bool is_same_point = (pinfo.able_min_letter == pinfo.able_max_letter);
-            bool hit_min = (pinfo.able_min_letter == (req_letter + rem_letter));
-            bool hit_max = (pinfo.able_max_letter == (req_letter + rem_letter));
-            bool is_min_last = (pinfo.able_min_count == 1); 
-            bool is_max_last = (pinfo.able_max_count == 1);
-
-            if (is_same_point)
-            {
-                if (hit_min || hit_max)
-                {
-                    if (is_min_last || is_max_last)
-                    {
-                        pinfo.able_min_letter = 0;
-                        pinfo.able_max_letter = 0;
-                        pinfo.able_min_count = 0;
-                        pinfo.able_max_count = 0;
-                    }
-                    else
-                    {
-                        --pinfo.able_min_count;
-                        --pinfo.able_max_count;
-                    }
-                }
+                pinfo.max_size = iter->size;
             }
             else
             {
-                if (is_min_last || is_max_last)
-                {
-                    if (hit_min || hit_max)
-                    { update_page(); }
-                }
-                else
-                {
-                    if (hit_min)
-                    { --pinfo.able_min_count; }
-                    else if (hit_max)
-                    { --pinfo.able_max_count; }
-                }
+                pinfo.max_size = 0;
             }
         }
-
-        constexpr void update_used(auto used_iter, const size_t req_letter) noexcept
+        constexpr void update_reuse_alloc(auto iter, size_t pop_size) noexcept
         {
-            const size_t remain_letter = used_iter->able_letter - req_letter;
-            if(remain_letter != 0)
+            bool is_remain = (iter->size > pop_size);
+            if (is_remain)
             {
-                used_iter->pos = used_iter->pos + req_letter;
-                used_iter->able_letter = remain_letter;
-            }
-            else
-            { pinfo.used_log.erase(used_iter); }
-            update_usable(req_letter, remain_letter);
-        }
-
-        constexpr void update_release(const size_t letter_size) noexcept
-        {
-            bool is_empty = ((pinfo.able_min_letter == 0) && (pinfo.able_max_letter == 0));
-            bool is_same_point = (pinfo.able_min_letter == pinfo.able_max_letter);
-            bool need_max_update = (letter_size > pinfo.able_max_letter);
-            bool need_min_update = (letter_size < pinfo.able_min_letter);
-            bool hit_max = (letter_size == pinfo.able_max_letter);
-            bool hit_min = (letter_size == pinfo.able_max_letter);
-
-            if (is_empty)
-            {
-                pinfo.able_min_letter = letter_size;    
-                pinfo.able_max_letter = letter_size;
-                pinfo.able_min_count = 1;
-                pinfo.able_max_count = 1;
-            }
-            else if (is_same_point)
-            {
-                if (hit_min || hit_max)
-                {
-                    ++pinfo.able_min_count;
-                    ++pinfo.able_max_count;
-                }
-                else if (need_min_update)
-                {
-                    pinfo.able_min_letter = letter_size;
-                    pinfo.able_min_count = 1;
-                }
-                else if (need_max_update)
-                {
-                    pinfo.able_max_letter = letter_size;
-                    pinfo.able_max_count = 1;
-                }
+                iter->size -= pop_size;
+                iter->pos += pop_size;
             }
             else
             {
-                if (hit_min)
-                {
-                    ++pinfo.able_min_count;
-                }
-                else if (need_min_update)
-                {
-                    pinfo.able_min_letter = letter_size;
-                    pinfo.able_min_count = 1;
-                }
-                else if (hit_max)
-                {
-                    ++pinfo.able_max_count;
-                }
-                else if (need_max_update)
-                {
-                    pinfo.able_max_letter = letter_size;
-                    pinfo.able_max_count = 1;
-                }
+                pinfo.reinfo.erase(iter);
             }
         }
-
-        constexpr std::tuple<bool, LetterType*> writable(const size_t byte_size) noexcept
+        constexpr void update_info_dealloc(Word_t* ptr, size_t size) noexcept
         {
-            if(pinfo.writable_pos == 0) { pinfo.writable_letter = WordNum; }
-            size_t pos{ };
-            const size_t req_letter_num = fittable_size(byte_size);
-            if (pinfo.writable_letter < req_letter_num) { return {false, nullptr}; }
-            else
+            if (pinfo.max_size < size)
             {
-                pos = pinfo.writable_pos;
-                pinfo.writable_pos += req_letter_num;
-                pinfo.writable_letter -= req_letter_num;
-                return {true, words + pos};
+                pinfo.max_size = size;
             }
+            pinfo.reinfo.emplace_back(pos(ptr), size);
         }
 
-        constexpr std::tuple<bool, LetterType*> usable(const size_t byte_size)
+        constexpr Word_t* allocate_sequence(size_t size) noexcept
         {
-            const size_t req_letter = fittable_size(byte_size);
-            for (auto used_iter {pinfo.used_log.begin()}; used_iter < pinfo.used_log.end(); ++used_iter)
+            bool is_sequence_able = (size <= sequence_size());
+            if (is_sequence_able)
             {
-                if (used_iter->able_letter >= req_letter)
-                {
-                    size_t pos {used_iter->pos};
-                    update_used(used_iter, req_letter);
-                    return {true, &(words[pos])};
-                }
+                size_t ret_pos = pinfo.seq_cursor;
+                update_sequence_alloc(size);
+                return address(ret_pos);
             }
-            return {false, nullptr};
+            else { return nullptr; }
         }
-
+        constexpr Word_t* allocate_reuse(size_t size) noexcept
+        {
+            bool is_reuse_able = (size <= pinfo.max_size) && (pinfo.max_size != 0);
+            if (is_reuse_able)
+            {
+                auto comp = [=] (const memory_page_detail::reuse_info& arg) { return size <= arg.size; };
+                auto iter = std::find_if(pinfo.reinfo.begin(), pinfo.reinfo.end(), comp);
+                size_t ret_pos = iter->pos;
+                update_reuse_alloc(iter, size);
+                return address(ret_pos);
+            }
+            else { return nullptr; }
+        }
     public:
-        constexpr word_t& operator[](const size_t pos) noexcept { return words[pos]; }
-        constexpr word_t* begin() noexcept { return words; }
-        constexpr word_t* end() noexcept { return words + WordNum; }
-
-        constexpr size_t addr_pos(LetterType* ptr) noexcept
+        constexpr std::tuple<size_t, size_t> allocatable_info() noexcept { return {pinfo.max_size, sequence_size()}; }
+        constexpr bool allocatable(size_t size) noexcept
         {
-            constexpr auto minus = [] (const size_t arg0, const size_t arg1) { return (arg0 >= arg1) ? arg0 - arg1 : arg1 - arg0; };
-            const size_t conv_begin = reinterpret_cast<size_t>(&(words[0]));
-            const size_t conv_ptr = reinterpret_cast<size_t>(ptr);
-            const size_t ret = minus(conv_begin, conv_ptr);
-            if (ret == 0)
-            { return ret; }
-            else
-            { return ret/LetterSize; }
+            if ((pinfo.max_size >= size) || (sequence_size() >= size)) { return true; }
+            else { return false; }
         }
-
-        constexpr void restore() noexcept
+        constexpr Word_t* begin() noexcept { return page.data(); }
+        constexpr Word_t* end() noexcept { return page.data() + WordSize; }
+        constexpr bool is_own(Word_t* ptr) noexcept
         {
-            recycle();
-            recover();
-            update_page();
+            if ((begin() <= ptr) && (ptr < end())) { return true; }
+            else { return false; }
         }
-
-        constexpr std::tuple<bool, LetterType*> request(const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
+        constexpr size_t pos(Word_t* ptr) noexcept { return std::distance(page.data(), ptr); }
+        constexpr Word_t* address(size_t pos) noexcept { return page.data() + pos; }
+        constexpr Word_t& operator[](size_t pos) noexcept { return page[pos]; }
+        constexpr void deallocate(Word_t* ptr, size_t size) noexcept
         {
-            if (policy == memory_shelf_tag::policy::none)
-            {
-                std::tuple<bool, LetterType*> ret = usable(byte_size);
-                // if (ret.at<0>() == false) { return writable(byte_size); }
-                if (std::get<0>(ret) == false) { return writable(byte_size); }
-                else { return ret; }
-            }
-            else if (policy == memory_shelf_tag::policy::rich)
-            {
-                return writable(byte_size);
-            }
-            else if (policy == memory_shelf_tag::policy::poor)
-            {
-                return usable(byte_size);
-            }
-            else if (policy == memory_shelf_tag::policy::thrifty)
-            {
-                recycle();
-                auto ret = usable(byte_size);
-                recover();
-                update_page();
-                return ret;
-            }
-            else { return {false, nullptr}; }
+            update_info_dealloc(ptr, size);
+            gather_reuse_info();
+            update_info_max();
         }
-
-        constexpr void release(LetterType* ptr, const size_t byte_size) noexcept
-        {
-            const size_t letter_size = fittable_size(byte_size);
-            update_release(letter_size);
-            pinfo.used_log.emplace_back(addr_pos(ptr), letter_size);
+        constexpr Word_t* allocate(size_t size, policy_t pol = policy_t::reuse_seq) noexcept
+        { 
+            Word_t* ret{ };
+            if (pol == policy_t::reuse)
+            {
+                ret = allocate_reuse(size);
+            }
+            else if (pol == policy_t::reuse_seq)
+            {
+                ret = allocate_reuse(size);
+                if (ret == nullptr) { ret = allocate_sequence(size); }
+            }
+            else if (pol == policy_t::seq)
+            {
+                ret = allocate_sequence(size);
+            }
+            else if (pol == policy_t::seq_reuse)
+            {
+                ret = allocate_sequence(size);
+                if (ret == nullptr) { ret = allocate_reuse(size); }
+            }
+            else { ret = nullptr; }
+            return ret;
         }
     };
 } // namespace sia
 
-// memory book
+//memory_book
 namespace sia
 {
     namespace memory_book_detail
@@ -349,174 +208,146 @@ namespace sia
         };
     } // namespace memory_book_detail
     
-    template <size_t PageNum, size_t WordNum, typename LetterType, size_t LetterSize>
+    template <size_t PageSize, size_t WordSize, typename Word_t>
     struct memory_book
     {
     private:
-        using page_t = memory_page<WordNum, LetterType, LetterSize>;
-        memory_book_detail::book_info<LetterType> binfo;
-        std::array<page_t, PageNum> pages;
+        using policy_t = memory_shelf_tag::policy;
+        using page_t = memory_page<WordSize, Word_t>;
+        using binfo_t = memory_book_detail::book_info<Word_t>;
 
-        constexpr void update_book_info() noexcept
-        {
-            binfo.begin = pages[0].begin();
-            binfo.end = pages[PageNum-1].end();
-        }
+        binfo_t binfo;
+        std::array<page_t, PageSize> book;
 
     public:
-        constexpr page_t& operator[](const size_t pos) noexcept { return pages[pos]; }
-        constexpr bool owned(LetterType* ptr) noexcept { return ((binfo.begin <= ptr) && (ptr < binfo.end)); }
-
-        constexpr size_t addr_pos(LetterType* ptr) noexcept
+        constexpr Word_t* first() noexcept { return book[0].begin(); }
+        constexpr Word_t* last() noexcept { return book[PageSize-1].end(); }
+        constexpr bool is_own(Word_t* ptr) noexcept
         {
-            constexpr size_t page_size = sizeof(page_t);
-            constexpr auto minus = [] (const size_t arg0, const size_t arg1) { return (arg0 >= arg1) ? arg0 - arg1 : arg1 - arg0; };
-            const size_t conv_begin = reinterpret_cast<size_t>(binfo.begin);
-            const size_t conv_ptr = reinterpret_cast<size_t>(ptr);      
-            const size_t ret = minus(conv_begin, conv_ptr);
-            if (ret == 0)
-            { return ret; }
-            else
-            { return ret/page_size; }
-        }
-
-        constexpr bool release(LetterType* ptr, const size_t byte_size) noexcept
-        {
-            if (binfo.begin != pages[0].begin())
-            { update_book_info(); }
-            if (owned(ptr))
+            if (binfo.begin != book[0].begin())
             {
-                pages[addr_pos(ptr)].release(ptr, byte_size);
-                return true;
+                binfo.begin = first();
+                binfo.end = last();
+            }
+            return (binfo.begin <= ptr) && (ptr < binfo.end);
+        }
+        constexpr bool allocactable(size_t size) noexcept
+        {
+            for (page_t& iter : book)
+            {
+                if (iter.allocatable(size))
+                {
+                    return true;
+                }
             }
             return false;
         }
-
-        constexpr LetterType* request(const size_t pos0, const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
+        constexpr page_t& operator[](size_t pos) noexcept { return book[pos]; }
+        constexpr Word_t* allocate(size_t size, policy_t policy) noexcept
         {
-            std::tuple<bool, LetterType*> result = pages[pos0].request(byte_size, policy);
-            // if (result.at<0>() == true)
-            // { return result.at<1>(); }
-            if (std::get<0>(result) == true)
-            { return std::get<1>(result); }
-            return nullptr;
-        }
-
-        constexpr LetterType* request(const size_t byte_size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
-        {
-            for (auto book_iter {pages.begin()}; book_iter < pages.end(); ++book_iter)
+            for (page_t& iter : book)
             {
-                std::tuple<bool, LetterType*> result = book_iter->request(byte_size, policy);
-                // if (result.at<0>() == true)
-                // { return result.at<1>(); }
-                if (std::get<0>(result) == true)
-                { return std::get<1>(result); }
+                if (iter.allocatable(size))
+                {
+                    return iter.allocate(size, policy);
+                }
             }
             return nullptr;
         }
-
-        constexpr void restore(const size_t pos) noexcept { pages[pos].restore(); }
-        constexpr void restore() noexcept
+        constexpr bool deallocate(Word_t* ptr, size_t size) noexcept
         {
-            for (auto& elem : pages)
-            { elem.restore(); }
+            for (page_t& iter : book)
+            {
+                if (iter.is_own(ptr))
+                {
+                    iter.deallocate(ptr, size);
+                    return true;
+                }
+            }
+            return false;
         }
     };
 } // namespace sia
 
-// memory_shelf
+//memory_shelf
 namespace sia
-{    
-    template <size_t PageNum, size_t WordNum, memory_shelf_tools::Allocatable LetterType = unsigned_interger_t<1>, size_t LetterSize = sizeof(LetterType)>
+{
+    template <typename Default_t, size_t PageSize, size_t WordSize, memory_shelf_tools::Allocatable Word_t = unsigned_interger_t<1>>
     struct memory_shelf
     {
     private:
-        using book_t = memory_book<PageNum, WordNum, LetterType, LetterSize>;
-        std::vector<book_t> books;
-        constexpr book_t& operator[](const size_t pos) noexcept { return books[pos]; }
+        using policy_t = memory_shelf_tag::policy;
+        using page_t = memory_page<WordSize, Word_t>;
+        using book_t = memory_book<PageSize, WordSize, Word_t>;
+
+        std::vector<book_t> shelf;
 
     public:
-        constexpr size_t word_size() noexcept { return LetterSize; }
-        constexpr size_t page_size() noexcept { return word_size() * WordNum; }
-        constexpr size_t book_size() noexcept { return page_size() * PageNum; }
-        constexpr size_t shelf_size() noexcept { return book_size() * books.capacity(); }
-        constexpr size_t capacity() noexcept { return books.capacity(); }
-        constexpr void assign(const size_t size) { books.assign(size, { }); }
-        
-        template <typename C>
-        constexpr std::tuple<bool, size_t, size_t, size_t> addr_pos(C* ptr) noexcept
+        constexpr memory_shelf(size_t assign_size) : shelf(assign_size) { }
+        constexpr void expand(size_t size) noexcept
         {
-            LetterType* conv_ptr = std::bit_cast<LetterType*>(ptr);
-            for (size_t pos0{ }; pos0 < capacity(); ++pos0)
+            shelf.reserve(size);
+            shelf.assign(size, { });
+        }
+
+        template <typename C = Default_t>
+        constexpr C* allocate(size_t book_pos, size_t page_pos, size_t size, policy_t policy = policy_t::reuse_seq) noexcept
+        {
+            bool is_over_size = ((sizeof(Word_t) * WordSize) < (sizeof(C) * size));
+            bool is_non_size = (size == 0);
+            constexpr auto oversize = [] (size_t target, size_t elem) { return std::ceil(static_cast<double>(target)/static_cast<double>(elem)); };
+            if (is_over_size || is_non_size) { return nullptr; }
+            size_t oversize_size = oversize(sizeof(C) * size, sizeof(Word_t));
+            return std::bit_cast<C*>(shelf[book_pos][page_pos].allocate(oversize_size, policy));
+        }
+
+        template <typename C = Default_t>
+        constexpr C* allocate(size_t book_pos, size_t size, policy_t policy = policy_t::reuse_seq) noexcept
+        {
+            bool is_over_size = ((sizeof(Word_t) * WordSize) < (sizeof(C) * size));
+            bool is_non_size = (size == 0);
+            constexpr auto oversize = [] (size_t target, size_t elem) { return std::ceil(static_cast<double>(target)/static_cast<double>(elem)); };
+            if (is_over_size || is_non_size) { return nullptr; }
+            size_t oversize_size = oversize(sizeof(C) * size, sizeof(Word_t));
+            return std::bit_cast<C*>(shelf[book_pos].allocate(oversize_size, policy));
+        }
+
+        template <typename C = Default_t>
+        constexpr C* allocate(size_t size = 1, policy_t policy = policy_t::reuse_seq) noexcept
+        {
+            bool is_over_size = ((sizeof(Word_t) * WordSize) < (sizeof(C) * size));
+            bool is_non_size = (size == 0);
+            constexpr auto oversize = [] (size_t target, size_t elem) { return std::ceil(static_cast<double>(target)/static_cast<double>(elem)); };
+            if (is_over_size || is_non_size) { return nullptr; }
+            size_t oversize_size = oversize(sizeof(C) * size, sizeof(Word_t));
+            for (book_t& iter : shelf)
             {
-                if (books[pos0].owned(conv_ptr))
+                if (iter.allocactable(oversize_size))
                 {
-                    size_t pos1 = books[pos0].addr_pos(conv_ptr);
-                    size_t pos2 = books[pos0][pos1].addr_pos(conv_ptr);
-                    return {true, pos0, pos1, pos2};
+                    return std::bit_cast<C*>(iter.allocate(oversize_size, policy));
                 }
-            }
-            return {false, 0, 0, 0};
-        }
-
-        template <typename C>
-        [[nodiscard]] constexpr C* allocate(const size_t pos0, const size_t pos1, const size_t& size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
-        {
-            if (size == 0) { return nullptr; }
-            if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
-            size_t req_byte_size = sizeof(C) * size;
-            LetterType* ptr{ };
-            ptr = books[pos0].request(pos1, req_byte_size);
-            if (ptr == nullptr) { return nullptr; }
-            return std::bit_cast<C*>(ptr);
-        }
-
-        template <typename C>
-        [[nodiscard]] constexpr C* allocate(const size_t pos0, const size_t& size, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
-        {
-            if (size == 0) { return nullptr; }
-            if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
-            size_t req_byte_size = sizeof(C) * size;
-            LetterType* ptr{ };
-            ptr = books[pos0].request(req_byte_size);
-            if (ptr == nullptr) { return nullptr; }
-            return std::bit_cast<C*>(ptr);
-        }
-
-        template <typename C>
-        [[nodiscard]] constexpr C* allocate(const size_t& size = 1, const memory_shelf_tag::policy policy = memory_shelf_tag::policy::none) noexcept
-        {
-            if (size == 0) { return nullptr; }
-            if (sizeof(C) * size > (sizeof(LetterType) * WordNum)) { return nullptr; }
-            size_t req_byte_size = sizeof(C) * size;
-            LetterType* ptr{ };
-            for (auto shelf_iter {books.begin()}; shelf_iter < books.end(); ++shelf_iter)
-            {
-                ptr = shelf_iter->request(req_byte_size, policy);
-                return std::bit_cast<C*>(ptr);
             }
             return nullptr;
         }
 
-        template <typename C>
-        constexpr bool deallocate(C* ptr, const size_t size = 1) noexcept
+        template <typename C = Default_t>
+        constexpr bool deallocate(C* ptr, size_t size = 1) noexcept
         {
-            LetterType* conv_ptr = std::bit_cast<LetterType*>(ptr);
-            if((ptr == nullptr) || (size == 0)) { return false; }
-            for (auto shelf_iter {books.begin()}; shelf_iter < books.end(); ++shelf_iter)
+            bool is_vaild = (ptr != nullptr) && (size != 0);
+            if (!is_vaild) { return false; }
+            constexpr auto oversize = [] (size_t target, size_t elem) { return std::ceil(static_cast<double>(target)/static_cast<double>(elem)); };
+            size_t oversize_size = oversize(sizeof(C) * size, sizeof(Word_t));
+            Word_t* target = std::bit_cast<Word_t*>(ptr);
+            for (book_t& iter : shelf)
             {
-                if (shelf_iter->release(conv_ptr, sizeof(C) * size))
-                { return true; }
+                if (iter.is_own(target))
+                {
+                    ptr->~C();
+                    return iter.deallocate(target, oversize_size);
+                }
             }
             return false;
         }
-
-        constexpr void restore(const size_t pos0, const size_t pos1) noexcept { books[pos0].restore(pos1); }
-        constexpr void restore(const size_t pos0) noexcept { books[pos0].restore(); }
-        constexpr void restore() noexcept
-        {
-            for (auto& elem : books)
-            { elem.restore(); }
-        }
     };
 } // namespace sia
+
