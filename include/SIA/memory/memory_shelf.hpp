@@ -85,8 +85,7 @@ namespace sia
                 pinfo.reinfo.erase(rewrite_iter);
             }
         }
-        constexpr void update_sequence_alloc(size_t size) noexcept { pinfo.seq_cursor += size; }
-        constexpr void update_info_max() noexcept
+        constexpr void update_max_info() noexcept
         {
             constexpr auto comp = [] (const memory_page_detail::reuse_info& arg0, const memory_page_detail::reuse_info& arg1) { return arg0.size < arg1.size; };
             auto iter = std::max_element(pinfo.reinfo.begin(), pinfo.reinfo.end(), comp);
@@ -99,7 +98,8 @@ namespace sia
                 pinfo.max_size = 0;
             }
         }
-        constexpr void update_reuse_alloc(auto iter, size_t pop_size) noexcept
+        constexpr void update_sequence_alloc_info(size_t size) noexcept { pinfo.seq_cursor += size; }
+        constexpr void update_reuse_alloc_info(auto iter, size_t pop_size) noexcept
         {
             bool is_remain = (iter->size > pop_size);
             if (is_remain)
@@ -112,7 +112,7 @@ namespace sia
                 pinfo.reinfo.erase(iter);
             }
         }
-        constexpr void update_info_dealloc(Word_t* ptr, size_t size) noexcept
+        constexpr void update_dealloc_info(Word_t* ptr, size_t size) noexcept
         {
             if (pinfo.max_size < size)
             {
@@ -127,7 +127,7 @@ namespace sia
             if (is_sequence_able)
             {
                 size_t ret_pos = pinfo.seq_cursor;
-                update_sequence_alloc(size);
+                update_sequence_alloc_info(size);
                 return address(ret_pos);
             }
             else { return nullptr; }
@@ -140,33 +140,32 @@ namespace sia
                 auto comp = [=] (const memory_page_detail::reuse_info& arg) { return size <= arg.size; };
                 auto iter = std::find_if(pinfo.reinfo.begin(), pinfo.reinfo.end(), comp);
                 size_t ret_pos = iter->pos;
-                update_reuse_alloc(iter, size);
+                update_reuse_alloc_info(iter, size);
                 return address(ret_pos);
             }
             else { return nullptr; }
         }
     public:
-        constexpr std::tuple<size_t, size_t> allocatable_info() noexcept { return {pinfo.max_size, sequence_size()}; }
+        constexpr Word_t* begin() noexcept { return page.data(); }
+        constexpr Word_t* end() noexcept { return page.data() + WordSize; }
+        constexpr Word_t* address(size_t pos) noexcept { return page.data() + pos; }
+        constexpr Word_t& operator[](size_t pos) noexcept { return page[pos]; }
+        constexpr size_t pos(Word_t* ptr) noexcept { return std::distance(page.data(), ptr); }
         constexpr bool allocatable(size_t size) noexcept
         {
             if ((pinfo.max_size >= size) || (sequence_size() >= size)) { return true; }
             else { return false; }
         }
-        constexpr Word_t* begin() noexcept { return page.data(); }
-        constexpr Word_t* end() noexcept { return page.data() + WordSize; }
         constexpr bool is_own(Word_t* ptr) noexcept
         {
             if ((begin() <= ptr) && (ptr < end())) { return true; }
             else { return false; }
         }
-        constexpr size_t pos(Word_t* ptr) noexcept { return std::distance(page.data(), ptr); }
-        constexpr Word_t* address(size_t pos) noexcept { return page.data() + pos; }
-        constexpr Word_t& operator[](size_t pos) noexcept { return page[pos]; }
         constexpr void deallocate(Word_t* ptr, size_t size) noexcept
         {
-            update_info_dealloc(ptr, size);
+            update_dealloc_info(ptr, size);
             gather_reuse_info();
-            update_info_max();
+            update_max_info();
         }
         constexpr Word_t* allocate(size_t size, policy_t pol = policy_t::reuse_seq) noexcept
         { 
@@ -279,15 +278,28 @@ namespace sia
         using policy_t = memory_shelf_tag::policy;
         using page_t = memory_page<WordSize, Word_t>;
         using book_t = memory_book<PageSize, WordSize, Word_t>;
+        using shlef_t = std::vector<book_t>;
 
-        std::vector<book_t> shelf;
+        shlef_t shelf;
 
+        memory_shelf(const memory_shelf&) = delete;
+        memory_shelf& operator=(const memory_shelf&) = delete;
     public:
-        constexpr memory_shelf(size_t assign_size) : shelf(assign_size) { }
+        constexpr memory_shelf(size_t assign_size) noexcept : shelf(assign_size) { }
+        constexpr memory_shelf() noexcept : shelf() { }
+
+        constexpr void expand_to_fit() noexcept { shelf.assign(shelf.capacity() - shelf.size()); }
         constexpr void expand(size_t size) noexcept
         {
-            shelf.reserve(size);
-            shelf.assign(size, { });
+            if (shelf.capacity() < (shelf.size() + size))
+            {
+                shelf.reserve(shelf.size() + size);
+                shelf.assign(size, { });
+            }
+            else
+            {
+                shelf.assign(size, { });
+            }
         }
 
         template <typename C = Default_t>
@@ -350,4 +362,47 @@ namespace sia
         }
     };
 } // namespace sia
+
+namespace sia
+{
+    namespace shelf_allocator_detail
+    {
+        template <size_t Id, typename Default_t, size_t PageSize, size_t WordSize, typename Word_t>
+        static constexpr memory_shelf<Default_t, PageSize, WordSize, Word_t>& get_shlef() noexcept
+        {
+            static memory_shelf<Default_t, PageSize, WordSize, Word_t> single { };
+            return single;
+        }
+    } // namespace shelf_allocator_detail
+    
+    template <size_t Id, typename Default_t, size_t PageSize, size_t WordSize, typename Word_t = unsigned_interger_t<1>>
+    struct shelf_allocator
+    {
+        using policy_t = memory_shelf_tag::policy;
+
+        constexpr void expand_to_fit() noexcept { shelf_allocator_detail::get_shlef<Default_t, PageSize, WordSize, Word_t>().expand_to_fit(); }
+        constexpr void expand(size_t size) noexcept { shelf_allocator_detail::get_shlef<Default_t, PageSize, WordSize, Word_t>().expand(size); }
+        template <typename C>
+        constexpr bool deallocate(C*&& ptr, size_t size = 1) noexcept
+        {
+            return shelf_allocator_detail::get_shlef<Id, Default_t, PageSize, WordSize, Word_t>().deallocate(std::forward<C*>(ptr), size);
+        }
+        template <typename C = Default_t>
+        constexpr C* allocate(size_t book_pos, size_t page_pos, size_t size, policy_t policy = policy_t::reuse_seq) noexcept
+        {
+            return shelf_allocator_detail::get_shlef<Id, Default_t, PageSize, WordSize, Word_t>().allocate(book_pos, page_pos, size, policy);
+        }
+        template <typename C = Default_t>
+        constexpr C* allocate(size_t book_pos, size_t size, policy_t policy = policy_t::reuse_seq) noexcept
+        {
+            return shelf_allocator_detail::get_shlef<Id, Default_t, PageSize, WordSize, Word_t>().allocate(book_pos, size, policy);
+        }
+        template <typename C = Default_t>
+        constexpr C* allocate(size_t size = 1, policy_t policy = policy_t::reuse_seq) noexcept
+        {
+            return shelf_allocator_detail::get_shlef<Id, Default_t, PageSize, WordSize, Word_t>().allocate(size, policy);
+        }
+    };
+} // namespace sia
+
 

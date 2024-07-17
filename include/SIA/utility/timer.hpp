@@ -43,7 +43,6 @@ namespace sia
     struct runner
     {
         timer tm;
-        size_t func_num;
 
         template <typename F>
         constexpr void measurement(F&& func) noexcept
@@ -53,19 +52,19 @@ namespace sia
             tm.now();
         }
 
-        template <typename Duration_t>
+        template <typename Duration_t = std::chrono::nanoseconds>
         constexpr void result() noexcept
         {
-            for (size_t count{0}, pos{0}; count < func_num; ++count, pos += 2)
+            for (size_t count{0}; count < (tm.point.size() / 2); ++count)
             {
                 if (count == 0)
                 {
-                    std::print("Function {} : {}\n", count, std::chrono::duration_cast<Duration_t>(tm[pos + 1] - tm[pos]));
+                    std::print("Function {} : {}\n", count, std::chrono::duration_cast<Duration_t>(tm[count + 1] - tm[count]));
                 }
                 else
                 {
-                    auto before = std::chrono::duration_cast<Duration_t>(tm[pos-1] - tm[pos-2]);
-                    auto cur = std::chrono::duration_cast<Duration_t>(tm[pos + 1] - tm[pos]);
+                    auto before = std::chrono::duration_cast<Duration_t>(tm[(count * 2) - 1] - tm[(count * 2) - 2]);
+                    auto cur = std::chrono::duration_cast<Duration_t>(tm[(count * 2) + 1] - tm[(count * 2)]);
                     double percent = (1.0l - static_cast<double>(cur.count())/static_cast<double>(before.count()))*100.0l;
                     std::print("Function {} : {} ({:.3f} %)\n", count, cur, percent);
                 }
@@ -73,6 +72,6 @@ namespace sia
         }
 
         template <typename... Fs>
-        constexpr runner(Fs&&... args) : tm(), func_num(sizeof...(Fs)) { (measurement(std::forward<Fs>(args)), ...); }
+        constexpr runner(Fs&&... args) : tm() { (measurement(std::forward<Fs>(args)), ...); }
     };
 } // namespace sia

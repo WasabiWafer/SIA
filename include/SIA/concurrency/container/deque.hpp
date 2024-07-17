@@ -1,208 +1,143 @@
 #pragma once
 
-#include <memory>
-#include <mutex>
-#include <atomic>
-#include <thread>
-#include <type_traits>
+#include <tuple>
 
 #include "SIA/internals/types.hpp"
-#include "SIA/utility/constant_tag.hpp"
-#include "SIA/concurrency/atomic/mutex.hpp"
+#include "SIA/container/ring.hpp"
+#include "SIA/utility/cache_type.hpp"
 
-// SPSC deque
+// spsc deque
+namespace sia
+{    
+    namespace concurrency
+    {
+        namespace spsc
+        {
+            namespace deque_detail
+            {                
+                struct point
+                {
+                    false_share<std::atomic<size_t>> back;
+                    false_share<std::atomic<size_t>> front;
+                    false_share<size_t> sav_back;
+                    false_share<size_t> sav_front;
+                };
+            } // namespace deque_detail
+
+            template <typename T, typename Allocator = std::allocator<T>>
+            struct deque
+            {
+            private:
+                using point_t = deque_detail::point;
+
+                point_t m_point;
+                false_share<ring<T, Allocator>> m_ring;
+
+                deque(const deque&) = delete;
+                deque& operator=(const deque&) = delete;
+
+                constexpr bool full(size_t back_pos, size_t front_pos) noexcept { return back_pos == (front_pos + m_ring->capacity()); }
+                constexpr bool empty(size_t back_pos, size_t front_pos) noexcept { return back_pos == front_pos; }
+
+                template <typename... Cs>
+                constexpr void emplace(size_t pos, Cs&&... args) { new (m_ring->address(pos)) T(std::forward<Cs>(args)...); }
+
+                constexpr std::tuple<bool, size_t> get_back_pos() noexcept
+                {
+                    size_t back_pos = m_point.back->load(std::memory_order_relaxed);
+                    if (full(back_pos, m_point.sav_front.self()))
+                    {
+                        m_point.sav_front.self() = m_point.front->load(std::memory_order_acquire);
+                        if (full(back_pos, m_point.sav_front.self()))
+                        {
+                            return {false, 0};
+                        }
+                    }
+                    return {true, back_pos};
+                }
+
+                constexpr std::tuple<bool, size_t> get_front_pos() noexcept
+                {
+                    size_t front_pos = m_point.front->load(std::memory_order_relaxed);
+                    if (empty(m_point.sav_back.self(), front_pos))
+                    {
+                        m_point.sav_back.self() = m_point.back->load(std::memory_order_acquire);
+                        if (empty(m_point.sav_back.self(), front_pos))
+                        {
+                            return {false, 0};
+                        }
+                    }
+                    return {true, front_pos};
+                }
+                
+            public:
+                constexpr deque() noexcept = default;
+                constexpr deque(size_t size) noexcept : m_point(), m_ring(size) { }
+
+                template <typename C>
+                constexpr bool push_back(C&& arg) noexcept
+                {
+                    auto tup = get_back_pos();
+                    if (std::get<0>(tup) == false)
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        emplace(std::get<1>(tup), std::forward<C>(arg));
+                        m_point.back->store(std::get<1>(tup) + 1, std::memory_order_release);
+                        return true;
+                    }
+                }
+
+                template <typename... Cs>
+                constexpr bool emplace_back(Cs&&... args) noexcept
+                {
+                    auto tup = get_back_pos();
+                    if (std::get<0>(tup) == false)
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        emplace(std::get<1>(tup), std::forward<Cs>(args)...);
+                        m_point.back->store(std::get<1>(tup) + 1, std::memory_order_release);
+                        return true;
+                    }
+                }
+
+                template <typename C>
+                constexpr bool pop_front(C&& arg) noexcept
+                {
+                    auto tup = get_front_pos();
+                    if (std::get<0>(tup) == false)
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        arg = std::move(m_ring->operator[](std::get<1>(tup)));
+                        m_ring->address(std::get<1>(tup))->~T();
+                        m_point.front->store(std::get<1>(tup) + 1, std::memory_order_release);
+                        return true;
+                    }
+                }
+            };
+        } // namespace spsc
+    } // namespace concurrency
+} // namespace sia
+
+
 namespace sia
 {
     namespace concurrency
     {
-        template <typename, typename>
-        struct deque;
+        namespace mpmc
+        {
+            struct deque
+            {
+
+            };
+        } // namespace mpmc
     } // namespace concurrency
-    
-
-    namespace concurrency_deque_detail
-    {
-        template <typename, typename>
-        struct deque;
-
-        enum class action { push, pop };
-
-        struct cursor
-        {
-        public:
-            static_assert(std::atomic<size_t>::is_always_lock_free);
-            alignas(std::hardware_destructive_interference_size) std::atomic<size_t> push;
-            alignas(std::hardware_destructive_interference_size) size_t cache_push;
-            alignas(std::hardware_destructive_interference_size) std::atomic<size_t> pop;
-            alignas(std::hardware_destructive_interference_size) size_t cache_pop;
-        private:
-            unsigned_interger_t<1> padding[std::hardware_destructive_interference_size - sizeof(size_t)];
-        };
-
-        template <typename T, typename Allocator = std::allocator<T>>
-        struct ring : private Allocator
-        {
-            const size_t capacity;
-            T* data;
-            constexpr ring(size_t size) noexcept : capacity(size), data(this->Allocator::allocate(size)) { }
-            ~ring() { this->Allocator::deallocate(data, capacity); }
-            constexpr T* operator[](size_t pos) noexcept { return data + (pos%capacity); }
-        };
-
-        template <auto Tag, typename T, typename Allocator>
-        struct place : private constant_tag<Tag>
-        {
-        private:
-            using tag_t = constant_tag<Tag>;
-            using deque_t = concurrency::deque<T, Allocator>;
-
-            deque_t* que;
-            size_t cursor;
-
-            place(const place&) noexcept = delete;
-            place& operator=(const place&) = delete;
-
-        public:
-            constexpr place(deque_t* arg, size_t cur) noexcept : que(arg), cursor(cur) { }
-            constexpr place() noexcept = default;
-
-            ~place()
-            {
-                if (que != nullptr)
-                {
-                    if (this->tag_t::query(action::push))
-                    {
-                        que->cursor.push.store(cursor + 1, std::memory_order_release);
-                    }
-                    else if (this->tag_t::query(action::pop))
-                    {
-                        this->get()->~T();
-                        que->cursor.pop.store(cursor + 1, std::memory_order_release);
-                    }
-                }
-            }
-
-            constexpr T* get() noexcept
-            {
-                if (que != nullptr) { return que->operator[](cursor); }
-                return nullptr;
-            }
-            constexpr void release() noexcept { que = nullptr; }
-            constexpr operator bool() { return (que != nullptr); }
-
-        };
-    } // namespace concurrency_deque_detail
-    
-    namespace concurrency
-    {
-        template <typename T, typename Allocator = std::allocator<T>>
-        struct deque
-        {
-        private:
-            template <auto, typename, typename>
-            friend struct concurrency_deque_detail::place;
-
-            template <auto E, typename T0, typename T1>
-            using place_t = concurrency_deque_detail::place<E, T0, T1>;
-            using push_t = place_t<concurrency_deque_detail::action::push, T, Allocator>;
-            using pop_t = place_t<concurrency_deque_detail::action::pop, T, Allocator>;
-
-            concurrency_deque_detail::cursor cursor;
-            concurrency_deque_detail::ring<T, Allocator> ring;
-
-            deque() = delete;
-            deque(const deque&) = delete;
-            deque& operator=(const deque&) = delete;
-
-            constexpr bool full(size_t c_push, size_t c_pop) noexcept { return (c_push - c_pop) == ring.capacity; }
-            constexpr bool empty(size_t c_push, size_t c_pop) noexcept { return c_push == c_pop; }
-
-            constexpr push_t push() noexcept
-            {
-                size_t c_push = cursor.push.load(std::memory_order_relaxed);
-                if (full(c_push, cursor.cache_pop))
-                {
-                    cursor.cache_pop = cursor.pop.load(std::memory_order_acquire);
-                    if (full(c_push, cursor.cache_pop)) { return { }; }
-                }
-                return {this, c_push};
-            }
-
-            constexpr pop_t pop() noexcept
-            {
-                size_t c_pop = cursor.pop.load(std::memory_order_relaxed);
-                if (empty(cursor.cache_push, c_pop))
-                {
-                    cursor.cache_push = cursor.push.load(std::memory_order_acquire);
-                    if (empty(cursor.cache_push, c_pop)) { return pop_t{ }; }
-                }
-                return {this, c_pop};
-            }
-
-        public:
-            constexpr deque(size_t size) noexcept : cursor(), ring(size) { }
-            ~deque() noexcept { while(pop()) { } }
-
-            constexpr T* operator[](size_t pos) noexcept { return ring[pos]; }
-
-            constexpr size_t capacity() noexcept { return ring.capacity; }
-            constexpr size_t size() noexcept{ return cursor.push.load(std::memory_order_relaxed) - cursor.pop.load(std::memory_order_relaxed); }
-            constexpr bool empty() noexcept { return size() == 0; }
-            constexpr bool full() noexcept { return size() == ring.capacity; }
-            
-            template <typename C>
-            constexpr bool push(C&& arg) noexcept
-            {
-                push_t place = push();
-                if (place)
-                {
-                    new (place.get()) C{std::forward<C>(arg)};
-                    return true;
-                }
-                return false;
-            }
-
-            template <typename C>
-            constexpr bool pop(C&& arg) noexcept
-            {
-                pop_t place = pop();
-                if (place)
-                {
-                    arg = std::move(*(place.get()));
-                    return true;
-                }
-                return false;
-            }
-        };
-
-        template <typename T, typename Allocator>
-        struct deque_service
-        {
-        private:
-            deque<T, Allocator>& que;
-            mutex mtx_push;
-            mutex mtx_pop;
-
-            deque_service() = delete;
-            deque_service(const deque_service&) = delete;
-            deque_service& operator=(const deque_service&) = delete;
-
-        public:
-            constexpr deque_service(deque<T, Allocator>& arg) : que(arg), mtx_push(), mtx_pop() { }
-
-            template <typename C>
-            constexpr bool push(C&& arg) noexcept
-            {
-                std::lock_guard lg{mtx_push};
-                return que.push(std::forward<C>(arg));
-            }
-
-            template <typename C>
-            constexpr bool pop(C&& arg) noexcept
-            {
-                std::lock_guard lg{mtx_pop};
-                return que.pop(std::forward<C>(arg));
-            }
-        };
-    } // namespace concurrency
-} // namespace sia
+} // namespace sia  
