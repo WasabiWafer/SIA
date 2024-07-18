@@ -195,7 +195,7 @@ namespace sia
                 {
                     size_t pos = m_point.shadow_back->fetch_add(1, std::memory_order_relaxed);
                     size_t own = m_flag->operator[](pos).m_own->fetch_add(1, std::memory_order_relaxed);
-                    if (own > 1 || full() || (pos != m_point.back->load(std::memory_order_relaxed)))
+                    if (own >= 1 || full() || (pos != m_point.back->load(std::memory_order_relaxed)))
                     {
                         m_point.shadow_back->fetch_sub(1, std::memory_order_relaxed);
                         m_flag->operator[](pos).m_own->fetch_sub(1, std::memory_order_relaxed);
@@ -215,7 +215,7 @@ namespace sia
                 {
                     size_t pos = m_point.shadow_back->fetch_add(1, std::memory_order_relaxed);
                     size_t own = m_flag->operator[](pos).m_own->fetch_add(1, std::memory_order_relaxed);
-                    if (own > 1 || full() || (pos != m_point.back->load(std::memory_order_relaxed)))
+                    if (own >= 1 || full() || (pos != m_point.back->load(std::memory_order_relaxed)))
                     {
                         m_point.shadow_back->fetch_sub(1, std::memory_order_relaxed);
                         m_flag->operator[](pos).m_own->fetch_sub(1, std::memory_order_relaxed);
