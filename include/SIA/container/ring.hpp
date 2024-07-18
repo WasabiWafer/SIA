@@ -39,7 +39,13 @@ namespace sia
             arg.m_ptr = nullptr;
             return *this;
         }
-        ~ring() { this->Allocator::deallocate(m_ptr, m_cap); }
+        ~ring()
+        {
+            if (m_ptr != nullptr)
+            {
+                this->Allocator::deallocate(m_ptr, m_cap);
+            }
+        }
 
         constexpr size_t capacity(this auto&& self) noexcept { return self.m_cap; }
         constexpr T* data(this auto&& self) noexcept { return self.m_ptr; }

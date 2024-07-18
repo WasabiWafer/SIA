@@ -5,6 +5,7 @@
 
 #include "SIA/internals/tags.hpp"
 #include "SIA/internals/types.hpp"
+#include "SIA/utility/align_wrapper.hpp"
 #include "SIA/utility/timer.hpp"
 
 namespace sia
@@ -12,9 +13,7 @@ namespace sia
     struct mutex
     {
         private:
-        alignas(std::hardware_destructive_interference_size) std::atomic_flag atf;
-        unsigned_interger_t<1> padding[std::hardware_destructive_interference_size - sizeof(std::atomic_flag)];
-        
+        false_share<std::atomic_flag> atf;
 
         mutex(const mutex&) = delete;
         mutex& operator=(const mutex&) = delete;
@@ -22,12 +21,12 @@ namespace sia
         public:
         constexpr mutex() noexcept = default;
 
-        void unlock() noexcept { atf.clear(std::memory_order_relaxed); }
+        void unlock() noexcept { atf->clear(std::memory_order_relaxed); }
         void lock() noexcept
         {
-            while (atf.test_and_set(std::memory_order_acquire))
+            while (atf->test_and_set(std::memory_order_acquire))
             {
-                while (atf.test(std::memory_order_relaxed))
+                while (atf->test(std::memory_order_relaxed))
                 {
                     std::this_thread::yield();
                 }
@@ -38,9 +37,9 @@ namespace sia
         bool try_lock(std::chrono::duration<Contain_t, std::ratio<E0, E1>> time) noexcept
         {
             single_timer timer{ };
-            while (atf.test_and_set(std::memory_order_acquire))
+            while (atf->test_and_set(std::memory_order_acquire))
             {
-                while (atf.test(std::memory_order_relaxed))
+                while (atf->test(std::memory_order_relaxed))
                 {
                     timer.now();
                     if (timer.get() <= time) { std::this_thread::yield(); }
@@ -54,9 +53,9 @@ namespace sia
         {
             single_timer timer{ };
             const auto time = std::chrono_literals::operator""ms(ms);
-            while (atf.test_and_set(std::memory_order_acquire))
+            while (atf->test_and_set(std::memory_order_acquire))
             {
-                while (atf.test(std::memory_order_relaxed))
+                while (atf->test(std::memory_order_relaxed))
                 {
                     timer.now();
                     if (timer.get() <= time) { std::this_thread::yield(); }

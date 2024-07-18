@@ -74,6 +74,7 @@ namespace sia
     template <size_t Size> using floating_point_t    = decltype(types_detail::get_floating_type<Size>());
     using largest_size_t    = decltype(types_detail::comp_leeq_ret_large<largest_integer_t, largest_floating_point_t>());
     using smallest_size_t   = decltype(types_detail::comp_leeq_ret_small<smallest_integer_t, smallest_floating_point_t>());
+    using byte_t    = unsigned_interger_t<1>;
     using word_t    = unsigned_interger_t<2>;
     using dword_t   = unsigned_interger_t<4>;
     using qword_t   = unsigned_interger_t<8>;
