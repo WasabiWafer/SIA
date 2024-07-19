@@ -49,8 +49,8 @@ namespace sia
 
         constexpr size_t capacity(this auto&& self) noexcept { return self.m_cap; }
         constexpr T* data(this auto&& self) noexcept { return self.m_ptr; }
-        constexpr T* begin(this auto&& self) noexcept { return self.data; }
-        constexpr T* end(this auto&& self) noexcept { return self.data + self.m_cap; }
+        constexpr T* begin(this auto&& self) noexcept { return self.m_ptr; }
+        constexpr T* end(this auto&& self) noexcept { return self.m_ptr + self.m_cap; }
         constexpr T& operator[](this auto&& self, size_t pos) noexcept { return self.m_ptr[pos % self.m_cap]; }
         constexpr T* address(this auto&& self, size_t pos) noexcept { return self.m_ptr + (pos % self.m_cap); }
     };
