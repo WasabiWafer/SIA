@@ -363,6 +363,7 @@ namespace sia
     };
 } // namespace sia
 
+// allocator helper (TO DO : std::pmr::allocator interface)
 namespace sia
 {
     namespace shelf_allocator_detail

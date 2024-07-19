@@ -6,6 +6,7 @@
 
 namespace sia
 {
+    // TO DO : std::pmr::allocator
     template <typename T, typename Allocator = std::allocator<T>>
     struct ring : private Allocator
     {

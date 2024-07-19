@@ -19,8 +19,8 @@ namespace sia
                 {
                     false_share<std::atomic<size_t>> back;
                     false_share<std::atomic<size_t>> front;
-                    false_share<size_t> sav_back;
-                    false_share<size_t> sav_front;
+                    false_share<size_t> shadow_back;
+                    false_share<size_t> shadow_front;
                 };
             } // namespace deque_detail
 
@@ -33,108 +33,77 @@ namespace sia
                 point_t m_point;
                 ring<T> m_ring;
 
-                deque(const deque&) = delete;
-                deque& operator=(const deque&) = delete;
-
-                constexpr bool full(size_t back_pos, size_t front_pos) noexcept { return back_pos >= (front_pos + m_ring.capacity()); }
-                constexpr bool empty(size_t back_pos, size_t front_pos) noexcept { return back_pos <= front_pos; }
-                constexpr bool full() noexcept { return m_point.back->load(std::memory_order_acquire) >= (m_point.front->load(std::memory_order_acquire) + m_ring.capacity()); }
-                constexpr bool empty() noexcept { return m_point.back->load(std::memory_order_acquire) <= m_point.front->load(std::memory_order_acquire); }
-                constexpr size_t size() noexcept { return m_point.back->load(std::memory_order_relaxed) - m_point.front->load(std::memory_order_relaxed); }
+                constexpr size_t size(size_t back, size_t front) noexcept { return back - front; }
+                constexpr size_t full(size_t back, size_t front) noexcept { return size(back, front) == m_ring.capacity(); }
+                constexpr size_t empty(size_t back, size_t front) noexcept { return size(back, front) == 0; }
 
                 template <typename... Cs>
-                constexpr void emplace(size_t pos, Cs&&... args) { new (m_ring.address(pos)) T(std::forward<Cs>(args)...); }
-
-                constexpr std::tuple<bool, size_t> get_back_pos() noexcept
-                {
-                    size_t back_pos = m_point.back->load(std::memory_order_relaxed);
-                    if (full(back_pos, m_point.sav_front.self()))
-                    {
-                        m_point.sav_front.self() = m_point.front->load(std::memory_order_acquire);
-                        if (full(back_pos, m_point.sav_front.self()))
-                        {
-                            return {false, 0};
-                        }
-                    }
-                    return {true, back_pos};
-                }
-
-                constexpr std::tuple<bool, size_t> get_front_pos() noexcept
-                {
-                    size_t front_pos = m_point.front->load(std::memory_order_relaxed);
-                    if (empty(m_point.sav_back.self(), front_pos))
-                    {
-                        m_point.sav_back.self() = m_point.back->load(std::memory_order_acquire);
-                        if (empty(m_point.sav_back.self(), front_pos))
-                        {
-                            return {false, 0};
-                        }
-                    }
-                    return {true, front_pos};
-                }
-                
-            public:
-                constexpr deque(size_t size) noexcept : m_point(), m_ring(size) { }
-                ~deque()
-                {
-                    for (size_t pos{0}; pos < size(); ++pos)
-                    {
-                        m_ring[pos].~T();
-                    }
-                }
+                constexpr void emplace(size_t pos, Cs&&... args) noexcept { new (m_ring.address(pos)) T(std::forward<Cs>(args)...); }
 
                 template <typename C>
-                constexpr bool push_back(C&& arg) noexcept
+                constexpr void move_assign(C&& target, size_t pos) noexcept
                 {
-                    auto tup = get_back_pos();
-                    if (std::get<0>(tup) == false)
+                    std::forward<C>(target) = std::move(m_ring[pos]);
+                    m_ring[pos].~T();
+                }
+
+            public:
+                constexpr deque(size_t size) noexcept : m_point(), m_ring(size) { }
+                ~deque() noexcept
+                {
+                    for(auto& elem : m_ring)
                     {
-                        return false;
-                    }
-                    else
-                    {
-                        emplace(std::get<1>(tup), std::forward<C>(arg));
-                        m_point.back->store(std::get<1>(tup) + 1, std::memory_order_release);
-                        return true;
+                        elem.~T();
                     }
                 }
+
+                constexpr size_t size() noexcept { return m_point.back->load(std::memory_order_relaxed) - m_point.front->load(std::memory_order_relaxed); }
+                constexpr size_t full() noexcept { return size() == m_ring.capacity(); }
+                constexpr size_t empty() noexcept { return size() == 0; }
+
+                template <typename C>
+                constexpr bool push_back(C&& arg) noexcept { return emplace_back(std::forward<C>(arg)); }
 
                 template <typename... Cs>
                 constexpr bool emplace_back(Cs&&... args) noexcept
                 {
-                    auto tup = get_back_pos();
-                    if (std::get<0>(tup) == false)
+                    size_t real_pos = m_point.back->load(std::memory_order_relaxed);
+                    if (full(real_pos, m_point.shadow_front.self()))
                     {
-                        return false;
+                        m_point.shadow_front.self() = m_point.front->load(std::memory_order_acquire);
+                        if (full(real_pos, m_point.shadow_front.self()))
+                        {
+                            return false;
+                        }
                     }
-                    else
-                    {
-                        emplace(std::get<1>(tup), std::forward<Cs>(args)...);
-                        m_point.back->store(std::get<1>(tup) + 1, std::memory_order_release);
-                        return true;
-                    }
+                    emplace(real_pos, std::forward<Cs>(args)...);
+                    m_point.back->fetch_add(1, std::memory_order_relaxed);
+                    return true;
                 }
 
                 template <typename C>
                 constexpr bool pop_front(C&& arg) noexcept
                 {
-                    auto tup = get_front_pos();
-                    if (std::get<0>(tup) == false)
+                    size_t real_pos = m_point.front->load(std::memory_order_relaxed);
+                    if (empty(m_point.shadow_back.self(), real_pos))
                     {
-                        return false;
+                        m_point.shadow_back.self() = m_point.back->load(std::memory_order_acquire);
+                        if (empty(m_point.shadow_back.self(), real_pos))
+                        {
+                            return false;
+                        }
                     }
-                    else
-                    {
-                        std::forward<C>(arg) = std::move(m_ring.operator[](std::get<1>(tup)));
-                        m_ring.operator[](std::get<1>(tup)).~T();
-                        m_point.front->store(std::get<1>(tup) + 1, std::memory_order_release);
-                        return true;
-                    }
+                    move_assign(std::forward<C>(arg), real_pos);
+                    m_point.front->fetch_add(1, std::memory_order_relaxed);
+                    return true;
                 }
             };
+            
         } // namespace spsc
     } // namespace concurrency
 } // namespace sia
+
+
 
 // MPMC deque
 namespace sia
@@ -173,12 +142,6 @@ namespace sia
                 ring<flag_t> m_flag;
                 ring<T> m_ring;
 
-                constexpr bool full(size_t back_pos, size_t front_pos) noexcept { return back_pos >= (front_pos + m_ring.capacity()); }
-                constexpr bool empty(size_t back_pos, size_t front_pos) noexcept { return back_pos <= front_pos; }
-                constexpr bool full() noexcept { return full(m_point.back->load(std::memory_order_relaxed), m_point.front->load(std::memory_order_relaxed)); }
-                constexpr bool empty() noexcept { return empty(m_point.back->load(std::memory_order_relaxed), m_point.front->load(std::memory_order_relaxed)); }
-                constexpr size_t size() noexcept { return m_point.back->load(std::memory_order_relaxed) - m_point.front->load(std::memory_order_relaxed); }
-
                 template <typename... Cs>
                 constexpr void emplace(size_t pos, Cs&&... args) noexcept { new (m_ring.address(pos)) T(std::forward<Cs>(args)...); }
                 template <typename C>
@@ -188,6 +151,10 @@ namespace sia
                     m_ring[pos].~T();
                 }
 
+                // constexpr size_t size(size_t back, size_t front) noexcept { return back - front; }
+                // constexpr size_t full(size_t back, size_t front) noexcept { return size(back, front) == m_ring.capacity(); }
+                // constexpr size_t empty(size_t back, size_t front) noexcept { return size(back, front) == 0; }
+
             public:
                 constexpr deque(size_t size) noexcept : m_point(), m_flag(size), m_ring(size)
                 {
@@ -196,6 +163,7 @@ namespace sia
                         elem.m_out_flag->test_and_set();
                     }
                 }
+
                 ~deque() noexcept
                 {
                     for (auto& elem : m_ring)
@@ -204,74 +172,12 @@ namespace sia
                     }
                 }
 
-
-                template <typename... Cs>
-                constexpr bool emplace_back(Cs&&... args) noexcept
-                {
-                    size_t shadow_pos = m_point.shadow_back->fetch_add(1, std::memory_order_relaxed);
-                    bool is_shadow_out = m_flag[shadow_pos].m_out_flag->test(std::memory_order_relaxed);
-                    if (!is_shadow_out)
-                    {
-                        m_point.shadow_back->fetch_sub(1, std::memory_order_relaxed);
-                        return false;
-                    }
-                    else
-                    {
-                        size_t real_pos = m_point.back->fetch_add(1, std::memory_order_relaxed);
-                        bool owned = !(m_flag[real_pos].m_back_own_flag->test_and_set(std::memory_order_relaxed));
-                        if (!owned)
-                        {
-                            m_point.back->fetch_sub(1, std::memory_order_relaxed);
-                            m_point.shadow_back->fetch_sub(1, std::memory_order_relaxed);
-                            return false;
-                        }
-                        else
-                        {
-                            while(!(m_flag[real_pos].m_out_flag->test(std::memory_order_relaxed)))
-                            {
-                                std::this_thread::yield();
-                            }
-                            m_flag[real_pos].m_out_flag->clear(std::memory_order_relaxed);
-                            emplace(real_pos, std::forward<Cs>(args)...);
-                            m_flag[real_pos].m_new_flag->test_and_set(std::memory_order_relaxed);
-                            return true;
-                        }
-                    }
-                }
+                // constexpr size_t size() noexcept { return m_point.back->load(std::memory_order_relaxed) - m_point.front->load(std::memory_order_relaxed); }
+                // constexpr size_t full() noexcept { return size() == m_ring.capacity(); }
+                // constexpr size_t empty() noexcept { return size() == 0; }
 
                 template <typename C>
-                constexpr bool push_back(C&& arg) noexcept
-                {
-                    size_t shadow_pos = m_point.shadow_back->fetch_add(1, std::memory_order_relaxed);
-                    bool is_shadow_out = m_flag[shadow_pos].m_out_flag->test(std::memory_order_relaxed);
-                    if (!is_shadow_out)
-                    {
-                        m_point.shadow_back->fetch_sub(1, std::memory_order_relaxed);
-                        return false;
-                    }
-                    else
-                    {
-                        size_t real_pos = m_point.back->fetch_add(1, std::memory_order_relaxed);
-                        bool owned = !(m_flag[real_pos].m_back_own_flag->test_and_set(std::memory_order_relaxed));
-                        if (!owned)
-                        {
-                            m_point.back->fetch_sub(1, std::memory_order_relaxed);
-                            m_point.shadow_back->fetch_sub(1, std::memory_order_relaxed);
-                            return false;
-                        }
-                        else
-                        {
-                            while(!(m_flag[real_pos].m_out_flag->test(std::memory_order_relaxed)))
-                            {
-                                std::this_thread::yield();
-                            }
-                            m_flag[real_pos].m_out_flag->clear(std::memory_order_relaxed);
-                            emplace(real_pos, std::forward<C>(arg));
-                            m_flag[real_pos].m_new_flag->test_and_set(std::memory_order_relaxed);
-                            return true;
-                        }
-                    }
-                }
+                constexpr bool push_back(C&& arg) noexcept { return emplace_back(std::forward<C>(arg)); }
 
                 template <typename C>
                 constexpr bool pop_front(C&& arg) noexcept
@@ -287,23 +193,53 @@ namespace sia
                     {
                         size_t real_pos = m_point.front->fetch_add(1, std::memory_order_relaxed);
                         bool owned = !(m_flag[real_pos].m_front_own_flag->test_and_set(std::memory_order_relaxed));
-                        if (!owned)
+                        bool is_real_new = m_flag[real_pos].m_new_flag->test(std::memory_order_relaxed);
+                        if (!owned || !is_real_new)
                         {
+                            if (owned) { m_flag[real_pos].m_front_own_flag->clear(std::memory_order_relaxed); }
                             m_point.front->fetch_sub(1, std::memory_order_relaxed);
                             m_point.shadow_front->fetch_sub(1, std::memory_order_relaxed);
                             return false;
                         }
                         else
                         {
-                            while (!(m_flag[real_pos].m_new_flag->test(std::memory_order_relaxed)))
-                            {
-                                std::this_thread::yield();
-                            }
                             m_flag[real_pos].m_new_flag->clear(std::memory_order_relaxed);
                             move_assign(std::forward<C>(arg), real_pos);
                             m_flag[real_pos].m_back_own_flag->clear(std::memory_order_relaxed);
                             m_flag[real_pos].m_out_flag->test_and_set(std::memory_order_relaxed);
                             m_flag[real_pos].m_front_own_flag->clear(std::memory_order_relaxed);
+                            return true;
+                        }
+                    }
+                }
+
+                template <typename... Cs>
+                constexpr bool emplace_back(Cs&&... args) noexcept
+                {
+                    size_t shadow_pos = m_point.shadow_back->fetch_add(1, std::memory_order_relaxed);
+                    bool is_shadow_out = m_flag[shadow_pos].m_out_flag->test(std::memory_order_relaxed);
+                    if (!is_shadow_out)
+                    {
+                        m_point.shadow_back->fetch_sub(1, std::memory_order_relaxed);
+                        return false;
+                    }
+                    else
+                    {
+                        size_t real_pos = m_point.back->fetch_add(1, std::memory_order_relaxed);
+                        bool owned = !(m_flag[real_pos].m_back_own_flag->test_and_set(std::memory_order_relaxed));
+                        bool is_real_out = m_flag[real_pos].m_out_flag->test(std::memory_order_relaxed);
+                        if (!owned || !is_real_out)
+                        {
+                            if (owned) { m_flag[real_pos].m_back_own_flag->clear(std::memory_order_relaxed); }
+                            m_point.back->fetch_sub(1, std::memory_order_relaxed);
+                            m_point.shadow_back->fetch_sub(1, std::memory_order_relaxed);
+                            return false;
+                        }
+                        else
+                        {
+                            m_flag[real_pos].m_out_flag->clear(std::memory_order_relaxed);
+                            emplace(real_pos, std::forward<Cs>(args)...);
+                            m_flag[real_pos].m_new_flag->test_and_set(std::memory_order_relaxed);
                             return true;
                         }
                     }
