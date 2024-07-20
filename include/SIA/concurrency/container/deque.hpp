@@ -213,10 +213,9 @@ namespace sia
                             size_t real_pos = m_point.back->fetch_add(1, acq);
                             // bool real_own = !m_flag[real_pos].m_own_back_flag->test_and_set(acq);
                             // if (real_own) { m_flag[shadow_pos].m_own_back_flag->clear(acq); }
-                            // while(!m_flag[real_pos].m_own_back_flag->test(acq)) { }
                             // while (m_flag[real_pos].m_init_flag->test(acq)) { /*maybe*/ }
-
-                            while(!m_flag[real_pos].m_own_front_flag->test(acq)) { }
+                            // while(!m_flag[real_pos].m_own_back_flag->test(acq)) { }
+                            // while(!m_flag[real_pos].m_own_front_flag->test(acq)) { }
                             emplace(real_pos, std::forward<Cs>(args)...);
                             m_flag[real_pos].m_init_flag->test_and_set(acq);
                             // fire
@@ -244,10 +243,9 @@ namespace sia
                             size_t real_pos = m_point.front->fetch_add(1, acq);
                             // bool real_own = !m_flag[real_pos].m_own_front_flag->test_and_set(acq);
                             // if (real_own) { m_flag[shadow_pos].m_own_front_flag->clear(acq); }
-                            // while(!m_flag[real_pos].m_own_front_flag->test(acq)) { }
                             // while (!m_flag[real_pos].m_init_flag->test(acq)) { /*maybe*/ }
-
-                            while(!m_flag[real_pos].m_own_back_flag->test(acq)) { }
+                            // while(!m_flag[real_pos].m_own_front_flag->test(acq)) { }
+                            // while(!m_flag[real_pos].m_own_back_flag->test(acq)) { }
                             move_assign(real_pos, std::forward<C>(arg));
                             m_flag[real_pos].m_init_flag->clear(acq);
                             // fire
