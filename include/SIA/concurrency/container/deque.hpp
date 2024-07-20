@@ -142,14 +142,24 @@ namespace sia
                 ring<flag_t> m_flag;
                 ring<T> m_ring;
 
-                constexpr size_t size(size_t front, size_t back) noexcept { return (back - front); }
-                constexpr bool full(size_t front, size_t back) noexcept { return size(front, back) > m_ring.capacity(); }
+                constexpr size_t size(size_t front, size_t back) noexcept { return back - front; }
                 constexpr bool empty(size_t front, size_t back) noexcept { return size(front, back) == 0; }
+                constexpr bool full(size_t front, size_t back) noexcept { return size(front, back) >= m_ring.capacity(); }
                 constexpr bool pushable(size_t front, size_t back) noexcept { return verify_pos(front, back) ? !full(front, back) : false; }
                 constexpr bool popable(size_t front, size_t back) noexcept { return verify_pos(front, back) ? !empty(front, back) : false; }
                 constexpr bool verify_pos(size_t front, size_t back) noexcept
                 {
-                    return size(front, back) <= m_ring.capacity() ? true :  false;
+                    // 3 way checking
+                    size_t arg0 = size(front, back);
+                    size_t arg1 = size(0, back - front);
+                    size_t arg2 = size(front - back, 0);
+                    bool is_valid = ((arg0 == arg1) & (arg0 == arg2) & (arg1 == arg2));
+                    bool is_able = ((arg0 <= m_ring.capacity()) | (arg1 <= m_ring.capacity()) | (arg2 <= m_ring.capacity()));
+                    if (is_valid & is_able)
+                    {
+                        return true;
+                    }
+                    return false;
                 }
                 template <typename... Cs>
                 constexpr void emplace(size_t pos, Cs&&... args) noexcept { new (m_ring.address(pos)) T(std::forward<Cs>(args)...); }
@@ -193,16 +203,20 @@ namespace sia
                     constexpr auto acq = std::memory_order_acquire;
                     constexpr auto rlx = std::memory_order_relaxed;
                     size_t shadow_pos = m_point.shadow_back->fetch_add(1, acq);
-                    if (pushable(m_point.back->load(acq), shadow_pos))
+                    size_t temp_front = m_point.front->load(acq);
+                    if (pushable(temp_front, shadow_pos))
                     {
                         // bullet
                         bool shadow_own = !m_flag[shadow_pos].m_own_back_flag->test_and_set(acq);
                         if (shadow_own)
                         {
                             size_t real_pos = m_point.back->fetch_add(1, acq);
-                            bool real_own = !m_flag[real_pos].m_own_back_flag->test_and_set(acq);
-                            if (real_own) { m_flag[shadow_pos].m_own_back_flag->clear(acq); }
-                            while (m_flag[real_pos].m_init_flag->test(acq)) { /*maybe*/ }
+                            // bool real_own = !m_flag[real_pos].m_own_back_flag->test_and_set(acq);
+                            // if (real_own) { m_flag[shadow_pos].m_own_back_flag->clear(acq); }
+                            // while(!m_flag[real_pos].m_own_back_flag->test(acq)) { }
+                            // while (m_flag[real_pos].m_init_flag->test(acq)) { /*maybe*/ }
+
+                            while(!m_flag[real_pos].m_own_front_flag->test(acq)) { }
                             emplace(real_pos, std::forward<Cs>(args)...);
                             m_flag[real_pos].m_init_flag->test_and_set(acq);
                             // fire
@@ -210,7 +224,7 @@ namespace sia
                             return true;
                         }
                     }
-                    m_point.shadow_back->fetch_sub(1, rlx);
+                    m_point.shadow_back->fetch_sub(1, acq);
                     return false;
                 }
 
@@ -220,16 +234,20 @@ namespace sia
                     constexpr auto acq = std::memory_order_acquire;
                     constexpr auto rlx = std::memory_order_relaxed;
                     size_t shadow_pos = m_point.shadow_front->fetch_add(1, acq);
-                    if (popable(shadow_pos, m_point.back->load(acq)))
+                    size_t temp_back = m_point.back->load(acq);
+                    if (popable(shadow_pos, temp_back))
                     {
                         // bullet
                         bool shadow_own = !m_flag[shadow_pos].m_own_front_flag->test_and_set(acq);
                         if (shadow_own)
                         {
                             size_t real_pos = m_point.front->fetch_add(1, acq);
-                            bool real_own = !m_flag[real_pos].m_own_front_flag->test_and_set(acq);
-                            if (real_own) { m_flag[shadow_pos].m_own_front_flag->clear(acq); }
-                            while (!m_flag[real_pos].m_init_flag->test(acq)) { /*maybe*/ }
+                            // bool real_own = !m_flag[real_pos].m_own_front_flag->test_and_set(acq);
+                            // if (real_own) { m_flag[shadow_pos].m_own_front_flag->clear(acq); }
+                            // while(!m_flag[real_pos].m_own_front_flag->test(acq)) { }
+                            // while (!m_flag[real_pos].m_init_flag->test(acq)) { /*maybe*/ }
+
+                            while(!m_flag[real_pos].m_own_back_flag->test(acq)) { }
                             move_assign(real_pos, std::forward<C>(arg));
                             m_flag[real_pos].m_init_flag->clear(acq);
                             // fire
