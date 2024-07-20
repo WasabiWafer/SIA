@@ -124,16 +124,10 @@ namespace sia
 
                 struct flag_composit
                 {
-                    false_share<std::atomic_flag> m_back_own_flag;
-                    false_share<std::atomic_flag> m_front_own_flag;
-                    false_share<std::atomic_flag> m_own_flag;
+                    false_share<std::atomic_flag> m_own_back_flag;
                     false_share<std::atomic_flag> m_init_flag;
-                    false_share<std::atomic<size_t>> m_flag;
-                };
-
-                enum : size_t
-                {
-                    
+                    false_share<std::atomic_flag> m_own_front_flag;
+                    false_share<std::atomic_flag> m_void_flag;
                 };
             } // namespace deque_detail
             
@@ -149,11 +143,14 @@ namespace sia
                 ring<T> m_ring;
 
                 constexpr size_t size(size_t front, size_t back) noexcept { return (back - front); }
-                constexpr bool full(size_t front, size_t back) noexcept { return size(front, back) == m_ring.capacity(); }
+                constexpr bool full(size_t front, size_t back) noexcept { return size(front, back) > m_ring.capacity(); }
                 constexpr bool empty(size_t front, size_t back) noexcept { return size(front, back) == 0; }
-                constexpr bool verify_pos(size_t front, size_t back) noexcept { return size(front, back) <= m_ring.capacity() ? true :  false; }
-                constexpr bool pushable(size_t front, size_t back) noexcept { return verify_pos(front, back) ? full(front, back) : false; }
-                constexpr bool popable(size_t front, size_t back) noexcept { return verify_pos(front, back) ? empty(front, back) : false; }
+                constexpr bool pushable(size_t front, size_t back) noexcept { return verify_pos(front, back) ? !full(front, back) : false; }
+                constexpr bool popable(size_t front, size_t back) noexcept { return verify_pos(front, back) ? !empty(front, back) : false; }
+                constexpr bool verify_pos(size_t front, size_t back) noexcept
+                {
+                    return size(front, back) <= m_ring.capacity() ? true :  false;
+                }
                 template <typename... Cs>
                 constexpr void emplace(size_t pos, Cs&&... args) noexcept { new (m_ring.address(pos)) T(std::forward<Cs>(args)...); }
                 template <typename C>
@@ -163,91 +160,21 @@ namespace sia
                     m_ring[pos].~T();
                 }
 
-                template <typename... Cs>
-                constexpr void input(Cs&&... args)
-                {
-                    size_t pos = m_point.back->fetch_add(1, std::memory_order_relaxed);
-                    emplace(pos, std::forward<Cs>(args));
-                }
-
-                template <typename C>
-                constexpr void output(C&& arg)
-                {
-                    size_t pos = m_point.front->fetch_add(1, std::memory_order_relaxed);
-                    move_assign(pos, std::forward<C>(arg));
-                }
-
-                constexpr bool shadow_back_owning(size_t& arg) noexcept
-                {
-                    size_t shadow_pos { };
-                    bool owned {false};
-                    while (!owned)
-                    {
-                        shadow_pos = m_point.shadow_back->load(std::memory_order_relaxed);
-                        if (pushable(m_point.front->load(std::memory_order_relaxed), shadow_pos))
-                        {
-                            owned = !m_flag[shadow_pos].m_back_own_flag->test_and_set(std::memory_order_relaxed);
-                            if (owned)
-                            {
-                                arg = m_point.shadow_back->fetch_add(1, std::memory_order_relaxed);
-                                return true;
-                            }
-                        }
-                        else { return false; }
-                    }
-                    return false;
-                }
-
-                template <typename T>
-                constexpr bool push_owning(size_t& ret, T&& atm) noexcept
-                {
-                    size_t pos{ };
-                    bool owned {false};
-                    while (!owned)
-                    {
-                        pos = atm.load(std::memory_order_relaxed);
-                        if (pushable(m_point.front->load(std::memory_order_relaxed), pos))
-                        {
-                            owned = !m_flag[pos].m_back_own_flag->test_and_set(std::memory_order_relaxed);
-                            if (owned)
-                            {
-                                ret = atm.fetch_add(1, std::memory_order_relaxed);
-                                return true;
-                            }
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-                }
-
-                template <typename T>
-                constexpr bool pop_owning(size_t& ret, T&& atm) noexcept
-                {
-                    size_t pos{ };
-                    bool owned {false};
-                    while (!owned)
-                    {
-                        pos = atm.load(std::memory_order_relaxed);
-                        if (popable(pos, m_point.back->load(std::memory_order_relaxed)))
-                        {
-                            owned = !m_flag[pos].m_front_own_flag->test_and_set(std::memory_order_relaxed);
-                            if (owned)
-                            {
-                                ret = atm.fetch_add(1, std::memory_order_relaxed);
-                                return true;
-                            }
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-                }
-
             public:
-                constexpr deque(size_t size) noexcept : m_point(), m_flag(size), m_ring(size) { }
+                constexpr deque(size_t size) noexcept : m_point{ }, m_flag{size}, m_ring{size}
+                {
+                    m_point.back->store(0);
+                    m_point.front->store(0);
+                    m_point.shadow_back->store(0);
+                    m_point.shadow_front->store(0);
+                    for (auto& elem : m_flag)
+                    {
+                        elem.m_own_back_flag->clear(std::memory_order_relaxed);
+                        elem.m_init_flag->clear(std::memory_order_relaxed);
+                        elem.m_own_front_flag->test_and_set(std::memory_order_relaxed);
+                        elem.m_void_flag->test_and_set(std::memory_order_relaxed);
+                    }
+                }
 
                 ~deque() noexcept
                 {
@@ -263,40 +190,55 @@ namespace sia
                 template <typename... Cs>
                 constexpr bool emplace_back(Cs&&... args) noexcept
                 {
-                    size_t shadow_pos { };
-                    if (push_owning(shadow_pos, m_point.shadow_back.self()))
+                    constexpr auto acq = std::memory_order_acquire;
+                    constexpr auto rlx = std::memory_order_relaxed;
+                    size_t shadow_pos = m_point.shadow_back->fetch_add(1, acq);
+                    if (pushable(m_point.back->load(acq), shadow_pos))
                     {
-                        emplace(shadow_pos, std::forward<Cs>(args)...);
-                        m_flag[shadow_pos].m_init_flag->test_and_set(std::memory_order_relaxed);
-                        if (!m_flag[shadow_pos].m_front_own_flag->test_and_set(std::memory_order_relaxed))
-                        { m_flag[shadow_pos].m_front_own_flag->clear(std::memory_order_relaxed); }
-                        m_point.back->fetch_add(1, std::memory_order_relaxed);
-                        return true;
+                        // bullet
+                        bool shadow_own = !m_flag[shadow_pos].m_own_back_flag->test_and_set(acq);
+                        if (shadow_own)
+                        {
+                            size_t real_pos = m_point.back->fetch_add(1, acq);
+                            bool real_own = !m_flag[real_pos].m_own_back_flag->test_and_set(acq);
+                            if (real_own) { m_flag[shadow_pos].m_own_back_flag->clear(acq); }
+                            while (m_flag[real_pos].m_init_flag->test(acq)) { /*maybe*/ }
+                            emplace(real_pos, std::forward<Cs>(args)...);
+                            m_flag[real_pos].m_init_flag->test_and_set(acq);
+                            // fire
+                            m_flag[real_pos].m_own_front_flag->clear(acq);
+                            return true;
+                        }
                     }
-                    else
-                    {
-                        return false;
-                    }
+                    m_point.shadow_back->fetch_sub(1, rlx);
+                    return false;
                 }
 
                 template <typename C>
                 constexpr bool pop_front(C&& arg) noexcept
                 {
-                   size_t shadow_pos { };
-                   if (pop_owning(shadow_pos, m_point.shadow_front.self()))
-                   {
-                        while (!m_flag[shadow_pos].m_init_flag->test()) { std::this_thread::yield() }
-                        move_assign(shadow_pos, std::forward<C>(arg));
-                        m_flag[shadow_pos].m_init_flag->clear(std::memory_order_relaxed);
-                        if (!m_flag[shadow_pos].m_back_own_flag->test_and_set(std::memory_order_relaxed))
-                        { m_flag[shadow_pos].m_back_own_flag->clear(std::memory_order_relaxed); }
-                        m_point.front->fetch_add(1, std::memory_order_relaxed);
-                        return true;
-                   }
-                   else
-                   {
-                        return false;
-                   }
+                    constexpr auto acq = std::memory_order_acquire;
+                    constexpr auto rlx = std::memory_order_relaxed;
+                    size_t shadow_pos = m_point.shadow_front->fetch_add(1, acq);
+                    if (popable(shadow_pos, m_point.back->load(acq)))
+                    {
+                        // bullet
+                        bool shadow_own = !m_flag[shadow_pos].m_own_front_flag->test_and_set(acq);
+                        if (shadow_own)
+                        {
+                            size_t real_pos = m_point.front->fetch_add(1, acq);
+                            bool real_own = !m_flag[real_pos].m_own_front_flag->test_and_set(acq);
+                            if (real_own) { m_flag[shadow_pos].m_own_front_flag->clear(acq); }
+                            while (!m_flag[real_pos].m_init_flag->test(acq)) { /*maybe*/ }
+                            move_assign(real_pos, std::forward<C>(arg));
+                            m_flag[real_pos].m_init_flag->clear(acq);
+                            // fire
+                            m_flag[real_pos].m_own_back_flag->clear(acq);
+                            return true;
+                        }
+                    }
+                    m_point.shadow_front->fetch_sub(1, rlx);
+                    return false;
                 }
             };
         } // namespace mpmc
