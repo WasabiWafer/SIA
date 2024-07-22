@@ -14,13 +14,10 @@ namespace sia
     {
         private:
         false_share<std::atomic_flag> atf;
-
         mutex(const mutex&) = delete;
         mutex& operator=(const mutex&) = delete;
-
         public:
         constexpr mutex() noexcept = default;
-
         void unlock() noexcept { atf->clear(std::memory_order_relaxed); }
         void lock() noexcept
         {
@@ -32,27 +29,11 @@ namespace sia
                 }
             }
         }
-
+        bool try_lock() noexcept { return !atf->test_and_set(std::memory_order_acquire); }
         template <typename Contain_t, auto E0, auto E1>
         bool try_lock(std::chrono::duration<Contain_t, std::ratio<E0, E1>> time) noexcept
         {
             single_timer timer{ };
-            while (atf->test_and_set(std::memory_order_acquire))
-            {
-                while (atf->test(std::memory_order_relaxed))
-                {
-                    timer.now();
-                    if (timer.get() <= time) { std::this_thread::yield(); }
-                    else { return false; }
-                }
-            }
-            return true;
-        }
-
-        bool try_lock(const size_t ms = 0) noexcept
-        {
-            single_timer timer{ };
-            const auto time = std::chrono_literals::operator""ms(ms);
             while (atf->test_and_set(std::memory_order_acquire))
             {
                 while (atf->test(std::memory_order_relaxed))
