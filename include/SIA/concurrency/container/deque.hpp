@@ -1,6 +1,6 @@
 #pragma once
 
-#include <tuple>
+#include <forward_list>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/container/ring.hpp"
@@ -17,13 +17,13 @@ namespace sia
             namespace spsc
             {
                 namespace deque_detail
-                {                
+                {
                     struct point
                     {
-                        false_share<std::atomic<size_t>> back;
                         false_share<std::atomic<size_t>> front;
-                        size_t shadow_back;
+                        false_share<std::atomic<size_t>> back;
                         size_t shadow_front;
+                        size_t shadow_back;
                     };
                 } // namespace deque_detail
 
