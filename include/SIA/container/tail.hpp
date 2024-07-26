@@ -24,17 +24,15 @@ namespace sia
         };
     } // namespace tail_detail
 
-    template <typename T> using tail_data_t = tail_detail::tail_data<T>;
-    template <typename T, typename Allocator = std::allocator<tail_data_t<T>>>
+    template <typename T, typename Allocator = std::allocator<T>>
     struct tail {
     private:
         using tail_data_t = tail_detail::tail_data<T>;
-        using allocator_traits_t = std::allocator_traits<Allocator>;
+        using alloc_rebind = std::allocator_traits<Allocator>::template rebind_alloc<tail_data_t>;
+        using allocator_traits_t = std::allocator_traits<alloc_rebind>;
 
-        compressed_pair<Allocator, tail_data_t*> compair;
+        compressed_pair<alloc_rebind, tail_data_t*> compair;
 
-        template <typename... Cs>
-        constexpr void emplace(tail_data_t* at, tail_data_t* ptr, Cs&&... args) noexcept { allocator_traits_t::construct(compair.first(), at, ptr, std::forward<Cs>(args)...); }
         template <typename... Cs>
         constexpr tail_data_t* gen_block(tail_data_t* ptr, Cs&&... args) noexcept
         {
@@ -72,6 +70,7 @@ namespace sia
         }
 
         constexpr tail_data_t* begin() noexcept { return compair.second(); }
+
         template <typename... Cs>
         constexpr void insert_after(tail_data_t* ptr, Cs&&... args) noexcept
         {
@@ -82,9 +81,7 @@ namespace sia
         constexpr void remove_after(tail_data_t* ptr) noexcept
         {
             tail_data_t* target = ptr->tail();
-            if (target == nullptr) { }
-            else
-            {
+            if (target != nullptr) {
                 tail_data_t* next = target->tail();
                 ptr->tail() = next;
                 allocator_traits_t::deallocate(compair.first(), target, 1);
