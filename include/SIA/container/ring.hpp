@@ -20,44 +20,37 @@ namespace sia
                 beg->~T();
             }
         }
+        
+        constexpr compressed_pair<Allocator, T*>& get_compair() noexcept {
+            return compair;
+        }
 
     public:
-        constexpr ring() noexcept 
-            : compair(compressed_pair_tag::zero, allocator_traits_t::allocate(compair.first(), Size)) {
-            for (auto& elem : *this) { allocator_traits_t::construct(compair.first(), &elem); }
-        }
-
-        template <typename... Cs> requires (sizeof...(Cs) <= Size)
-        constexpr ring(Cs&&... args) noexcept
-            : compair(compressed_pair_tag::zero, nullptr) {
-            compair.second() = allocator_traits_t::allocate(compair.first(), Size);
-            auto target = compair.second();
-            (allocator_traits_t::construct(compair.first(), target++, std::forward<Cs>(args)), ...);
-        }
-
-        constexpr ring(const Allocator& arg) noexcept
-            : compair(compressed_pair_tag::one, arg, nullptr) {
+        constexpr ring(const Allocator& alloc = Allocator()) noexcept
+            : compair(compressed_pair_tag::one, alloc, nullptr) {
             compair.second() = allocator_traits_t::allocate(compair.first(), Size);
             for (auto& elem : *this) { allocator_traits_t::construct(compair.first(), &elem); }
         }
 
-        template <typename... Cs> requires (sizeof...(Cs) <= Size)
-        constexpr ring(const Allocator& arg, Cs&&... args) noexcept
-            : compair(compressed_pair_tag::one, arg, nullptr) {
+        constexpr ring(std::initializer_list<T> arg, const Allocator& alloc = Allocator()) noexcept
+            : compair(compressed_pair_tag::one, alloc, nullptr) {
+            static_assert(arg.size() <= Size);
             compair.second() = allocator_traits_t::allocate(compair.first(), Size);
             auto target = compair.second();
-            (allocator_traits_t::construct(compair.first(), target++, std::forward<Cs>(args)), ...);
+            for (auto& elem : arg) {
+                allocator_traits_t::construct(compair.first(), target++, elem);
+            }
         }
 
-        constexpr ring(const ring& arg) noexcept
-            : compair(compressed_pair_tag::one, arg.compair.first(), nullptr) {
+        constexpr ring(const ring& arg, const Allocator& alloc = Allocator()) noexcept
+            : compair(compressed_pair_tag::one, alloc, nullptr) {
             auto& target = compair.second();
             target = allocator_traits_t::allocate(compair.first(), Size);
             std::memcpy(target, arg.compair.second(), sizeof(T) * Size);
         }
         
-        constexpr ring(ring&& arg) noexcept
-            : compair(compressed_pair_tag::one, arg.compair.first(), arg.compair.second()) {
+        constexpr ring(ring&& arg, const Allocator& alloc = Allocator()) noexcept
+            : compair(compressed_pair_tag::one, alloc, arg.compair.second()) {
             arg.compair.second() = nullptr;
         }
 
@@ -86,8 +79,7 @@ namespace sia
 
         ~ring()
         {
-            if (compair.second() != nullptr)
-            {
+            if (compair.second() != nullptr) {
                 destruct_elem();
                 allocator_traits_t::deallocate(compair.first(), compair.second(), Size);
             }

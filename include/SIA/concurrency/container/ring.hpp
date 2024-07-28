@@ -39,10 +39,7 @@ namespace sia
                 public:
                     constexpr ring(const ring&) noexcept = delete;
                     constexpr ring& operator=(const ring&) noexcept = delete;
-                    constexpr ring() noexcept
-                        : m_point(), m_ring()
-                    { }
-                    constexpr ring(const Allocator& alloc) noexcept
+                    constexpr ring(const Allocator& alloc = Allocator()) noexcept
                         : m_point(), m_ring(compressed_pair_tag::one, alloc)
                     { }
 
@@ -55,7 +52,6 @@ namespace sia
                     constexpr bool try_emplace_back(Cs&&... args) noexcept {
                         constexpr auto acq = std::memory_order_acquire;
                         constexpr auto rlx = std::memory_order_relaxed;
-                        constexpr auto rle = std::memory_order_release;
                         size_t back = m_point.back->load(rlx);
                         if (full(m_point.shadow_front, back))
                         {
@@ -74,7 +70,6 @@ namespace sia
                     constexpr bool try_pop_front(C&& arg) noexcept {
                         constexpr auto acq = std::memory_order_acquire;
                         constexpr auto rlx = std::memory_order_relaxed;
-                        constexpr auto rle = std::memory_order_release;
                         size_t front = m_point.front->load(rlx);
                         if (empty(front, m_point.shadow_back))
                         {

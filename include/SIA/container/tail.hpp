@@ -17,6 +17,7 @@ namespace sia
             tail_data* m_tail;
             T m_data;
         public:
+            constexpr tail_data() noexcept : m_tail(nullptr), m_data() { }
             template <typename... Cs>
             constexpr tail_data(tail_data* ptr, Cs&&... args) noexcept : m_tail(ptr), m_data(std::forward<Cs>(args)...) { }
             constexpr tail_data*& tail() noexcept { return m_tail; }
@@ -34,47 +35,70 @@ namespace sia
         compressed_pair<alloc_rebind, tail_data_t*> compair;
 
         template <typename... Cs>
-        constexpr tail_data_t* gen_block(tail_data_t* ptr, Cs&&... args) noexcept
+        constexpr tail_data_t* emplace_block(Cs&&... args) noexcept
         {
             tail_data_t* ret = allocator_traits_t::allocate(compair.first(), 1);
-            allocator_traits_t::construct(compair.first(), ret, ptr, std::forward<Cs>(args)...);
+            allocator_traits_t::construct(compair.first(), ret, std::forward<Cs>(args)...);
             return ret;
         }
         constexpr tail_data_t* concat(std::initializer_list<tail_data_t*> arg) noexcept
         {
-            auto tmp = arg.begin();
-            for(auto iter{arg.begin() + 1}; iter != arg.end(); ++iter)
+            auto target = arg.begin();
+            for(auto iter{arg.begin()}; iter != arg.end(); ++iter)
             {
-                (*tmp)->tail() = (*iter);
-                tmp = iter;
+                if (iter != arg.begin())
+                {
+                    (*target)->tail() = (*iter);
+                    target = iter;
+                }
             }
             return *(arg.begin());
         }
     public:
+        constexpr tail(const Allocator& alloc = Allocator()) noexcept
+            : compair(compressed_pair_tag::one, alloc, nullptr)
+        { }
+
+        constexpr tail(std::initializer_list<T> arg, const Allocator& alloc = Allocator()) noexcept
+            : compair(compressed_pair_tag::one, alloc, nullptr)
+        {
+            if (arg.size() > 0)
+            {
+                tail_data_t* head = emplace_block(nullptr);
+                tail_data_t* target = head;
+                for (auto iter{arg.begin()}; iter != arg.end(); ++iter)
+                {
+                    bool is_last = ((arg.end() - 1) == iter);
+                    if (is_last)
+                    {
+                        allocator_traits_t::construct(compair.first(), target, nullptr, *iter);
+                    }
+                    else
+                    {
+                        allocator_traits_t::construct(compair.first(), target, allocator_traits_t::allocate(compair.first(), 1), *iter);
+                    }
+                    target = target->tail();
+                }
+                compair.second() = head;
+            }
+        }
+
         ~tail() noexcept
         {
             tail_data_t* target = compair.second();
-            tail_data_t* target_next { };
             while (target != nullptr)
             {
-                target_next = target->tail();
+                tail_data_t* target_next = target_next = target->tail();
                 allocator_traits_t::deallocate(compair.first(), target, 1);
                 target = target_next;
             }
         }
-        constexpr tail() noexcept : compair(compressed_pair_tag::zero, nullptr) { }
-        template <typename C, typename... Cs>
-        constexpr tail(C&& arg, Cs&&... args) noexcept : compair(compressed_pair_tag::zero, gen_block(nullptr, std::forward<C>(arg)))
-        {
-            compair.second()->tail() = concat({gen_block(nullptr, std::forward<Cs>(args))...});
-        }
-
         constexpr tail_data_t* begin() noexcept { return compair.second(); }
 
         template <typename... Cs>
         constexpr void insert_after(tail_data_t* ptr, Cs&&... args) noexcept
         {
-            tail_data_t* new_data = concat({gen_block(ptr->tail(), std::forward<Cs>(args))...});
+            tail_data_t* new_data = concat({emplace_block(ptr->tail(), std::forward<Cs>(args))...});
             ptr->tail() = new_data;
         }
 
