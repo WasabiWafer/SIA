@@ -93,6 +93,8 @@ namespace sia
                 target = target_next;
             }
         }
+        constexpr alloc_rebind& get_alloc() noexcept { return compair.first(); }
+        constexpr auto& get_compair() noexcept { return compair; }
         constexpr tail_data_t* begin() noexcept { return compair.second(); }
 
         template <typename... Cs>

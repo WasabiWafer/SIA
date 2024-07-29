@@ -6,7 +6,7 @@
 #include "SIA/container/ring.hpp"
 #include "SIA/utility/align_wrapper.hpp"
 
-// lock_free spsc deque
+// lock_free spsc ring
 namespace sia
 {    
     namespace concurrency
@@ -85,6 +85,23 @@ namespace sia
                     }
                 };
             } // namespace spsc
+        } // namespace lock_free
+    } // namespace concurrency
+} // namespace sia
+
+
+// lock free mpmc ring
+namespace sia
+{
+    namespace concurrency
+    {
+        namespace lock_free
+        {
+            template <typename T, typename Allocator = std::allocator<T>>
+            struct ring 
+            {
+
+            };
         } // namespace lock_free
     } // namespace concurrency
 } // namespace sia

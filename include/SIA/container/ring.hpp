@@ -80,7 +80,7 @@ namespace sia
         ~ring()
         {
             if (compair.second() != nullptr) {
-                destruct_elem();
+                // destruct_elem();
                 allocator_traits_t::deallocate(compair.first(), compair.second(), Size);
             }
         }
