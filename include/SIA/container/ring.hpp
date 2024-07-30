@@ -13,13 +13,6 @@ namespace sia
     private:
         using allocator_traits_t = std::allocator_traits<Allocator>;
         compressed_pair<Allocator, T*> compair;
-
-        constexpr void destruct_elem() noexcept {
-            for(T* beg{compair.second()}; beg != (compair.second() + Size); ++beg)
-            {
-                beg->~T();
-            }
-        }
         
         constexpr compressed_pair<Allocator, T*>& get_compair() noexcept {
             return compair;
@@ -58,7 +51,6 @@ namespace sia
         {
             auto& target = compair.second();
             if (target != nullptr) {
-                destruct_elem();
                 allocator_traits_t::deallocate(compair.first(), target, Size);
             }
             std::memcpy(target, arg.compair.second(), sizeof(T) * Size);
@@ -69,7 +61,6 @@ namespace sia
         {
             auto& target = compair.second();
             if (target != nullptr) {
-                destruct_elem();
                 allocator_traits_t::deallocate(compair.first(), target, Size);
             }
             target = arg.compair.second();
@@ -80,7 +71,6 @@ namespace sia
         ~ring()
         {
             if (compair.second() != nullptr) {
-                // destruct_elem();
                 allocator_traits_t::deallocate(compair.first(), compair.second(), Size);
             }
         }
@@ -92,6 +82,6 @@ namespace sia
         constexpr T* address(this auto&& self, size_t pos) noexcept { return self.begin() + (pos % Size); }
         template <typename... Cs> constexpr void emplace(size_t pos, Cs&&... args) noexcept { allocator_traits_t::construct(compair.first(), address(pos), std::forward<Cs>(args)...); }
         template <typename C> constexpr void push(size_t pos, C&& arg) noexcept { operator[](pos) = std::forward<C>(arg); }
-        constexpr void destroy(size_t pos) noexcept { allocator_traits_t::destroy(compair.first(), address(pos)); }
+        // constexpr void destroy(size_t pos) noexcept { allocator_traits_t::destroy(compair.first(), address(pos)); }
     };
 } // namespace sia

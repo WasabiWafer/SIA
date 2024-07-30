@@ -28,7 +28,7 @@ namespace sia
         tp_t init;
         tp_t point;
 
-        single_timer() : init(std::chrono::high_resolution_clock::now()), point() { }
+        single_timer() : init(std::chrono::high_resolution_clock::now()), point(init) { }
 
         auto now() noexcept { point = std::chrono::high_resolution_clock::now(); }
         template <typename Duration_t = std::chrono::milliseconds>

@@ -18,9 +18,9 @@ namespace sia
         constexpr T contain(this auto&& self) noexcept { return T{ }; }
     protected:
         template <size_t N>
-        using hash_t = decltype(std::declval<type_pair>().hash<Key>());
+        using map_t = decltype(std::declval<type_pair>().map<Key>());
         template <size_t N> requires (Key == N)
-        constexpr type_pair hash(this auto&& self) noexcept { return type_pair{ }; }
+        constexpr type_pair map(this auto&& self) noexcept { return type_pair{ }; }
     };
 } // namespace sia
 
@@ -29,7 +29,7 @@ namespace sia
 {
     namespace type_sequence_detail
     {
-        template <class... Cls> struct overload : public Cls... { using Cls::hash...; };
+        template <class... Cls> struct overload : public Cls... { using Cls::map...; };
         template <class... Cls> overload(Cls...) -> overload<Cls...>;
 
         template <typename... Ts>
@@ -38,7 +38,7 @@ namespace sia
         struct type_sequence_impl<std::index_sequence<Seq...>, Ts...> : public type_pair<Seq, Ts>...
         {
         private:
-            template <size_t Idx> using select_base_t = decltype(std::declval<overload<type_pair<Seq, Ts>...>>().hash<Idx>());
+            template <size_t Idx> using select_base_t = decltype(std::declval<overload<type_pair<Seq, Ts>...>>().map<Idx>());
         };
     } // namespace type_sequence_detail
 
@@ -50,7 +50,7 @@ namespace sia
     public:
         constexpr size_t size(this auto&& self) noexcept { return sizeof...(Ts); }
         template <size_t Idx> requires (Idx < sizeof...(Ts))
-        constexpr auto at(this auto&& self) noexcept { return self.type_sequence::base_t::select_base_t<Idx>::template hash<Idx>(); }
+        constexpr auto at(this auto&& self) noexcept { return self.type_sequence::base_t::select_base_t<Idx>::template map<Idx>(); }
         template <size_t Idx> requires (Idx >= sizeof...(Ts))
         constexpr auto at(this auto&& self) noexcept { return nullptr; }
     };
