@@ -16,7 +16,7 @@ namespace sia
         {
             namespace spsc
             {
-                namespace deque_detail
+                namespace ring_detail
                 {
                     struct point
                     {
@@ -25,12 +25,12 @@ namespace sia
                         size_t shadow_front;
                         size_t shadow_back;
                     };
-                } // namespace deque_detail
+                } // namespace ring_detail
 
                 template <typename T, size_t Size, typename Allocator = std::allocator<T>>
                 struct ring {
                 private:
-                    using point_t = deque_detail::point;
+                    using point_t = ring_detail::point;
                     point_t m_point;
                     ::sia::ring<T, Size, Allocator> m_ring;
 
@@ -92,6 +92,7 @@ namespace sia
 
 
 // lock free mpmc ring
+// currently mpmc ring is not safe lock free
 namespace sia
 {
     namespace concurrency
