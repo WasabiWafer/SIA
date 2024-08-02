@@ -20,10 +20,10 @@ namespace sia
                 {
                     struct point
                     {
-                        false_share<std::atomic<size_t>> front;
-                        false_share<std::atomic<size_t>> back;
-                        size_t shadow_front;
-                        size_t shadow_back;
+                        false_share<std::atomic<size_t>> begin;
+                        false_share<std::atomic<size_t>> end;
+                        size_t shadow_begin;
+                        size_t shadow_end;
                     };
                 } // namespace ring_detail
 
@@ -53,17 +53,17 @@ namespace sia
                     constexpr bool try_emplace_back(Cs&&... args) noexcept {
                         constexpr auto acq = std::memory_order_acquire;
                         constexpr auto rlx = std::memory_order_relaxed;
-                        size_t back = m_point.back->load(rlx);
-                        if (full(m_point.shadow_front, back))
+                        size_t end = m_point.end->load(rlx);
+                        if (full(m_point.shadow_begin, end))
                         {
-                            m_point.shadow_front = m_point.front->load(acq);
-                            if (full(m_point.shadow_front, back))
+                            m_point.shadow_begin = m_point.begin->load(acq);
+                            if (full(m_point.shadow_begin, end))
                             {
                                 return false;
                             }
                         }
-                        m_ring.emplace(back, std::forward<Cs>(args)...);
-                        m_point.back->fetch_add(1, rlx);
+                        m_ring.emplace(end, std::forward<Cs>(args)...);
+                        m_point.end->fetch_add(1, rlx);
                         return true;
                     }
 
@@ -71,17 +71,17 @@ namespace sia
                     constexpr bool try_pop_front(C&& arg) noexcept {
                         constexpr auto acq = std::memory_order_acquire;
                         constexpr auto rlx = std::memory_order_relaxed;
-                        size_t front = m_point.front->load(rlx);
-                        if (empty(front, m_point.shadow_back))
+                        size_t begin = m_point.begin->load(rlx);
+                        if (empty(begin, m_point.shadow_end))
                         {
-                            m_point.shadow_back = m_point.back->load(acq);
-                            if (empty(front, m_point.shadow_back))
+                            m_point.shadow_end = m_point.end->load(acq);
+                            if (empty(begin, m_point.shadow_end))
                             {
                                 return false;
                             }
                         }
-                        arg = std::move(m_ring[front]);
-                        m_point.front->fetch_add(1, rlx);
+                        arg = std::move(m_ring[begin]);
+                        m_point.begin->fetch_add(1, rlx);
                         return true;
                     }
                 };
@@ -104,8 +104,8 @@ namespace sia
                 {
                     struct point
                     {
-                        false_share<std::atomic<size_t>> front;
-                        false_share<std::atomic<size_t>> back;
+                        false_share<std::atomic<size_t>> begin;
+                        false_share<std::atomic<size_t>> end;
                     };
                 } // namespace ring_detail
                 
@@ -141,18 +141,19 @@ namespace sia
                         constexpr auto rlx = std::memory_order_relaxed;
                         while (true)
                         {
-                            size_t back = m_point.back->load(rlx);
-                            if (!full(m_point.front->load(rlx), back))
+                            size_t end = m_point.end->load(rlx);
+                            if (!full(m_point.begin->load(rlx), end))
                             {
-                                if (m_ptr[back]->load(rlx) == nullptr)
+                                if (m_ptr[end]->load(rlx) == nullptr)
                                 {
-                                    if (m_point.back->compare_exchange_weak(back, back + 1, rlx, rlx))
+                                    if (m_point.end->compare_exchange_weak(end, end + 1, rlx, rlx))
                                     {
-                                        m_ring.emplace(back, std::forward<Cs>(args)...);
-                                        m_ptr[back]->store(m_ring.address(back), rlx);
+                                        m_ring.emplace(end, std::forward<Cs>(args)...);
+                                        m_ptr[end]->store(m_ring.address(end), rlx);
                                         return true;
                                     }
                                 }
+                                else
                                 {
                                     return false;
                                 }
@@ -172,15 +173,15 @@ namespace sia
                         constexpr auto rlx = std::memory_order_relaxed;
                         while (true)
                         {
-                            size_t front = m_point.front->load(rlx);
-                            if (!empty(front, m_point.back->load(rlx)))
+                            size_t begin = m_point.begin->load(rlx);
+                            if (!empty(begin, m_point.end->load(rlx)))
                             {
-                                if (m_ptr[front]->load(rlx) != nullptr)
+                                if (m_ptr[begin]->load(rlx) != nullptr)
                                 {
-                                    if (m_point.front->compare_exchange_weak(front, front + 1, rlx, rlx))
+                                    if (m_point.begin->compare_exchange_weak(begin, begin + 1, rlx, rlx))
                                     {
-                                        arg = std::move(*(m_ptr[front]->load(rlx)));
-                                        m_ptr[front]->store(nullptr, rlx);
+                                        arg = std::move(*(m_ptr[begin]->load(rlx)));
+                                        m_ptr[begin]->store(nullptr, rlx);
                                         return true;
                                     }
                                 }
