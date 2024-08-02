@@ -92,7 +92,6 @@ namespace sia
 
 
 // lock free mpmc ring
-// currently mpmc ring is not safe lock free
 namespace sia
 {
     namespace concurrency
@@ -117,16 +116,19 @@ namespace sia
                     using point_t = ring_detail::point;
                     using flag_t = false_share<std::atomic<size_t>>;
                     using flag_alloc = std::allocator_traits<Allocator>::template rebind_alloc<flag_t>;
+                    using ptr_alloc = std::allocator_traits<Allocator>::template rebind_alloc<false_share<std::atomic<T*>>>;
                     point_t m_point;
-                    ::sia::ring<flag_t, Size, flag_alloc> m_flag;
                     ::sia::ring<T, Size, Allocator> m_ring;
+                    ::sia::ring<false_share<std::atomic<T*>>, Size, ptr_alloc> m_ptr;
 
                     constexpr size_t size(size_t begin_pos, size_t end_pos) noexcept { return end_pos - begin_pos; }
                     constexpr bool full(size_t begin_pos, size_t end_pos) noexcept { return size(begin_pos, end_pos) == m_ring.capacity(); }
                     constexpr bool empty(size_t begin_pos, size_t end_pos) noexcept { return size(begin_pos, end_pos) == 0; }
                 public:
                     constexpr ring(const Allocator& alloc = Allocator()) noexcept
-                        : m_point(), m_flag(alloc), m_ring(alloc)
+                        : m_point(),
+                        m_ring(alloc),
+                        m_ptr(alloc)
                     { }
 
                     template <typename C>
@@ -137,21 +139,20 @@ namespace sia
                         constexpr auto acq = std::memory_order_acquire;
                         constexpr auto rle = std::memory_order_release;
                         constexpr auto rlx = std::memory_order_relaxed;
-                        while(true)
+                        while (true)
                         {
-                            size_t back_pos = m_point.back->load(rlx);
-                            if (!full(m_point.front->load(rlx), back_pos))
+                            size_t back = m_point.back->load(rlx);
+                            if (!full(m_point.front->load(rlx), back))
                             {
-                                if (m_flag[back_pos]->load(rlx) == 0)
+                                if (m_ptr[back]->load(rlx) == nullptr)
                                 {
-                                    if (m_point.back->compare_exchange_weak(back_pos, back_pos + 1, rlx, rlx))
+                                    if (m_point.back->compare_exchange_weak(back, back + 1, rlx, rlx))
                                     {
-                                        m_ring.emplace(back_pos, std::forward<Cs>(args)...);
-                                        m_flag[back_pos]->store(1, rlx);
+                                        m_ring.emplace(back, std::forward<Cs>(args)...);
+                                        m_ptr[back]->store(m_ring.address(back), rlx);
                                         return true;
                                     }
                                 }
-                                else
                                 {
                                     return false;
                                 }
@@ -169,17 +170,17 @@ namespace sia
                         constexpr auto acq = std::memory_order_acquire;
                         constexpr auto rle = std::memory_order_release;
                         constexpr auto rlx = std::memory_order_relaxed;
-                        while(true)
+                        while (true)
                         {
-                            size_t front_pos = m_point.front->load(rlx);
-                            if (!empty(front_pos, m_point.back->load(rlx)))
+                            size_t front = m_point.front->load(rlx);
+                            if (!empty(front, m_point.back->load(rlx)))
                             {
-                                if (m_flag[front_pos]->load(rlx) == 1)
+                                if (m_ptr[front]->load(rlx) != nullptr)
                                 {
-                                    if (m_point.front->compare_exchange_weak(front_pos, front_pos + 1, rlx, rlx))
+                                    if (m_point.front->compare_exchange_weak(front, front + 1, rlx, rlx))
                                     {
-                                        arg = std::move(m_ring[front_pos]);
-                                        m_flag[front_pos]->store(0, rlx);
+                                        arg = std::move(*(m_ptr[front]->load(rlx)));
+                                        m_ptr[front]->store(nullptr, rlx);
                                         return true;
                                     }
                                 }
@@ -199,4 +200,3 @@ namespace sia
         } // namespace lock_free
     } // namespace concurrency
 } // namespace sia
-
