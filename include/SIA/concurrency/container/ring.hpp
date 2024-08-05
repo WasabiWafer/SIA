@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <mutex>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/container/ring.hpp"
@@ -24,7 +23,7 @@ namespace sia
                         false_share<std::atomic<size_t>> end;
                         size_t shadow_begin;
                         size_t shadow_end;
-                    };
+                    }; // struct point
                 } // namespace ring_detail
 
                 template <typename T, size_t Size, typename Allocator = std::allocator<T>>
@@ -51,12 +50,11 @@ namespace sia
 
                     template <typename... Cs>
                     constexpr bool try_emplace_back(Cs&&... args) noexcept {
-                        constexpr auto acq = std::memory_order_acquire;
                         constexpr auto rlx = std::memory_order_relaxed;
                         size_t end = m_point.end->load(rlx);
                         if (full(m_point.shadow_begin, end))
                         {
-                            m_point.shadow_begin = m_point.begin->load(acq);
+                            m_point.shadow_begin = m_point.begin->load(rlx);
                             if (full(m_point.shadow_begin, end))
                             {
                                 return false;
@@ -69,12 +67,11 @@ namespace sia
 
                     template <typename C>
                     constexpr bool try_pop_front(C&& arg) noexcept {
-                        constexpr auto acq = std::memory_order_acquire;
                         constexpr auto rlx = std::memory_order_relaxed;
                         size_t begin = m_point.begin->load(rlx);
                         if (empty(begin, m_point.shadow_end))
                         {
-                            m_point.shadow_end = m_point.end->load(acq);
+                            m_point.shadow_end = m_point.end->load(rlx);
                             if (empty(begin, m_point.shadow_end))
                             {
                                 return false;
@@ -84,7 +81,7 @@ namespace sia
                         m_point.begin->fetch_add(1, rlx);
                         return true;
                     }
-                };
+                }; // struct ring
             } // namespace spsc
         } // namespace lock_free
     } // namespace concurrency
@@ -114,21 +111,20 @@ namespace sia
                 {
                 private:
                     using point_t = ring_detail::point;
-                    using flag_t = false_share<std::atomic<size_t>>;
-                    using flag_alloc = std::allocator_traits<Allocator>::template rebind_alloc<flag_t>;
                     using ptr_alloc = std::allocator_traits<Allocator>::template rebind_alloc<false_share<std::atomic<T*>>>;
+
                     point_t m_point;
-                    ::sia::ring<T, Size, Allocator> m_ring;
                     ::sia::ring<false_share<std::atomic<T*>>, Size, ptr_alloc> m_ptr;
+                    ::sia::ring<T, Size, Allocator> m_ring;
 
                     constexpr size_t size(size_t begin_pos, size_t end_pos) noexcept { return end_pos - begin_pos; }
                     constexpr bool full(size_t begin_pos, size_t end_pos) noexcept { return size(begin_pos, end_pos) == m_ring.capacity(); }
                     constexpr bool empty(size_t begin_pos, size_t end_pos) noexcept { return size(begin_pos, end_pos) == 0; }
                 public:
+                    constexpr ring(const ring&) noexcept = delete;
+                    constexpr ring& operator=(const ring&) noexcept = delete;
                     constexpr ring(const Allocator& alloc = Allocator()) noexcept
-                        : m_point(),
-                        m_ring(alloc),
-                        m_ptr(alloc)
+                        : m_point(), m_ptr(alloc), m_ring(alloc)
                     { }
 
                     template <typename C>
@@ -136,8 +132,6 @@ namespace sia
                     template <typename... Cs>
                     constexpr bool try_emplace_back(Cs&&... args) noexcept
                     {
-                        constexpr auto acq = std::memory_order_acquire;
-                        constexpr auto rle = std::memory_order_release;
                         constexpr auto rlx = std::memory_order_relaxed;
                         while (true)
                         {
@@ -168,8 +162,6 @@ namespace sia
                     template <typename C>
                     constexpr bool try_pop_front(C&& arg) noexcept
                     {
-                        constexpr auto acq = std::memory_order_acquire;
-                        constexpr auto rle = std::memory_order_release;
                         constexpr auto rlx = std::memory_order_relaxed;
                         while (true)
                         {
@@ -196,7 +188,7 @@ namespace sia
                             }
                         }
                     }
-                };
+                }; // struct ring
             } // namespace mpmc
         } // namespace lock_free
     } // namespace concurrency
