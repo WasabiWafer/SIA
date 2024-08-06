@@ -7,16 +7,12 @@
 
 namespace sia
 {
+    // change to pmr
     template <typename T , size_t Size, typename Allocator = std::allocator<T>>
-    struct ring
-    {
+    struct ring {
     private:
         using allocator_traits_t = std::allocator_traits<Allocator>;
         compressed_pair<Allocator, T*> compair;
-        
-        constexpr compressed_pair<Allocator, T*>& get_compair() noexcept {
-            return compair;
-        }
 
     public:
         constexpr ring(const Allocator& alloc = Allocator()) noexcept

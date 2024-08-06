@@ -105,7 +105,7 @@ namespace sia
                         false_share<std::atomic<size_t>> end;
                     };
                 } // namespace ring_detail
-                
+                // change to pmr
                 template <typename T, size_t Size, typename Allocator = std::allocator<T>>
                 struct ring 
                 {
