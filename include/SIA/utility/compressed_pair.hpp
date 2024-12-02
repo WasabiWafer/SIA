@@ -18,7 +18,8 @@ namespace sia
     } // namespace composit_pait_tag
     
     template <typename T0, typename T1, bool = std::is_empty_v<T0> && !std::is_final_v<T0>>
-    struct compressed_pair final : private T0 {
+    struct compressed_pair final : private T0
+    {
     private:
         T1 sec;
     public:
@@ -35,7 +36,8 @@ namespace sia
     };
 
     template <typename T0, typename T1>
-    struct compressed_pair<T0, T1, false> final {
+    struct compressed_pair<T0, T1, false> final
+    {
     private:
         T0 fir;
         T1 sec;

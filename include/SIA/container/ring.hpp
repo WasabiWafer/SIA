@@ -7,7 +7,6 @@
 
 namespace sia
 {
-    // change to pmr
     template <typename T , size_t Size, typename Allocator = std::allocator<T>>
     struct ring {
     private:
