@@ -16,23 +16,27 @@ namespace sia
             T m_data;
 
             template <typename... Tys>
-            constexpr tail_data(tail_data* next, Tys&&... args) : m_next(next), m_data(std::forward<Tys>(args)...) { }
+            constexpr tail_data(tail_data* next, Tys&&... args)
+                : m_next(next), m_data(std::forward<Tys>(args)...)
+            { }
         };
     } // namespace tail_detail
     
-    template <typename T, typename Alloc = std::allocator<T>>
+    template <typename T, typename Allocator = std::allocator<T>>
     struct tail
     {
     private:
         using data_t = tail_detail::tail_data<T>;
-        using tail_data_alloc = std::allocator_traits<Alloc>::template rebind_alloc<data_t>;
+        using tail_data_alloc = std::allocator_traits<Allocator>::template rebind_alloc<data_t>;
         using allocator_traits_t = std::allocator_traits<tail_data_alloc>;
 
         compressed_pair<tail_data_alloc, data_t*> m_compair;
         data_t* m_saved;
 
     public:
-        constexpr tail(const Alloc& alloc = Alloc()) : m_compair(compressed_pair_tag::one, alloc, nullptr), m_saved(nullptr) { }
+        constexpr tail(const Allocator& alloc = Allocator())
+            : m_compair(compressed_pair_tag::one, alloc, nullptr), m_saved(nullptr)
+        { }
 
         ~tail()
         {
