@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "SIA/container/lane.hpp"
+#include "SIA/utility/compressed_pair.hpp"
 
 namespace sia
 {
@@ -48,7 +48,7 @@ namespace sia
             m_data_end_point = m_end_point->m_data;
         }
 
-        bool chain_back() noexcept
+        bool chain_set_to_prev() noexcept
         {
             if (m_end_point->m_prev == nullptr) { return false; }
             else
@@ -100,7 +100,7 @@ namespace sia
         {
             if (is_chain_empty())
             {
-                if(chain_back())
+                if(chain_set_to_prev())
                 {
                     chain_pop_back(std::forward<Ty>(arg));
                     return true;

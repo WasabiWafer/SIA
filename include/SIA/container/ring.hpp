@@ -33,39 +33,6 @@ namespace sia
             }
         }
 
-        // constexpr ring(const ring& arg, const Allocator& alloc = Allocator()) noexcept
-        //     : m_compair(compressed_pair_tag::one, alloc, nullptr)
-        // {
-        //     auto& target = m_compair.second();
-        //     target = allocator_traits_t::allocate(m_compair.first(), Size);
-        //     std::memcpy(target, arg.m_compair.second(), sizeof(T) * Size);
-        // }
-        
-        // constexpr ring(ring&& arg, const Allocator& alloc = Allocator()) noexcept
-        //     : m_compair(compressed_pair_tag::one, alloc, arg.m_compair.second())
-        // { arg.m_compair.second() = nullptr; }
-
-        // constexpr ring& operator=(const ring& arg) noexcept
-        // {
-        //     auto& target = m_compair.second();
-        //     if (target != nullptr) {
-        //         allocator_traits_t::deallocate(m_compair.first(), target, Size);
-        //     }
-        //     std::memcpy(target, arg.m_compair.second(), sizeof(T) * Size);
-        //     return *this;
-        // }
-
-        // constexpr ring& operator=(ring&& arg) noexcept
-        // {
-        //     auto& target = m_compair.second();
-        //     if (target != nullptr) {
-        //         allocator_traits_t::deallocate(m_compair.first(), target, Size);
-        //     }
-        //     target = arg.m_compair.second();
-        //     arg.m_compair.second() = nullptr;
-        //     return *this;
-        // }
-
         ~ring()
         {
             if (m_compair.second() != nullptr) {
