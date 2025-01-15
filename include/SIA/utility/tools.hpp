@@ -4,13 +4,8 @@
 
 namespace sia
 {
-    template <typename... Ts>
-    struct overload : public Ts...
-    {
-        using Ts::operator()...;
-    };
-    template <typename... Ts>
-    overload(Ts...) -> overload<Ts...>;
+    template <typename... Ts> struct overload : public Ts... { using Ts::operator()...; };
+    template <typename... Ts> overload(Ts...) -> overload<Ts...>;
 
     template <auto Data>
     constexpr const auto& make_static() noexcept { return Data; }
