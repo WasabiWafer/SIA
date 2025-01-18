@@ -116,6 +116,12 @@ namespace sia
                 return ret;
             }
 
+            template <auto Callable>
+            constexpr void for_each(this auto&& self) noexcept
+            {
+                (Callable.template operator()<Ts>(), ...);
+            }
+
             template <size_t... Idxs>
             constexpr auto remove(this auto&& self) noexcept
             {
@@ -123,10 +129,8 @@ namespace sia
 
                 constexpr auto count_remove_impl = [] (size_t arg0, size_t& arg1) constexpr noexcept -> auto
                     {
-                        if ( ((arg0 == Idxs) || ...) )
-                        { ++arg1; }
-                        else
-                        { }
+                        if ( ((arg0 == Idxs) || ...) ) { ++arg1; }
+                        else { }
                     };
                 constexpr auto count_remove = [count_remove_impl] <size_t... Indxs> (std::index_sequence<Indxs...>) constexpr noexcept -> auto
                     {
@@ -156,17 +160,17 @@ namespace sia
                         (get_n_th_idx_impl.template operator()<Nth, Indxs>(n_count, pos), ...);
                         return pos;
                     };
-                constexpr auto lam0 = [get_n_th_idx] <size_t Nth, size_t... Indxs> (std::index_sequence<Indxs...> l_seq) constexpr noexcept -> auto
+                constexpr auto gen_container_impl = [get_n_th_idx] <size_t Nth, size_t... Indxs> (std::index_sequence<Indxs...> l_seq) constexpr noexcept -> auto
                     {
-                        type_container_impl copy { };
+                        constexpr type_container_impl copy { };
                         return copy.template at<get_n_th_idx.template operator()<Nth>(l_seq)>();
                     };
-                constexpr auto gen_list = [lam0] <size_t... Indxs0, size_t... Indxs1> (std::index_sequence<Indxs0...> r_seq, std::index_sequence<Indxs1...> l_seq) constexpr noexcept -> auto
+                constexpr auto gen_container = [gen_container_impl] <size_t... Indxs0, size_t... Indxs1> (std::index_sequence<Indxs0...> r_seq, std::index_sequence<Indxs1...> l_seq) constexpr noexcept -> auto
                     {
-                        return type_container<decltype(lam0.template operator()<Indxs0>(l_seq))...>();
+                        return type_container<decltype(gen_container_impl.template operator()<Indxs0>(l_seq))...>();
                     };
 
-                return gen_list(remove_run_seq, loop_seq);
+                return gen_container(remove_run_seq, loop_seq);
             }
         };
     } // namespace type_container_detail
@@ -186,6 +190,5 @@ namespace sia
         using insert_t = decltype(std::declval<base_t>().template insert<Idx, Tys...>());
         template <size_t... Idxs>
         using remove_t = decltype(std::declval<base_t>().template remove<Idxs...>());
-        // for_each, count_if
     };
 } // namespace sia
