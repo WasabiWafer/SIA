@@ -20,6 +20,17 @@ namespace sia
 
             template <typename Ty, size_t... Idxs>
             constexpr constant_string_data(Ty&& arr, std::index_sequence<Idxs...>) noexcept : m_data(arr[Idxs]...) { }
+            template <typename Ty, size_t... Idxs>
+            constexpr constant_string_data(const constant_string_data& arg, std::index_sequence<Idxs...>) noexcept : m_data(arg[Idxs]...) { }
+            constexpr constant_string_data& operator=(const constant_string_data& arg) noexcept
+            {
+                for (size_t idx = 0; idx < N; ++idx)
+                {
+                    m_data[idx] = arg.m_data[idx];
+                }
+                return *this;
+            }
+            constexpr T operator[](this auto&& self, size_t pos) noexcept { return self.m_data[pos]; }
         };
     } // namespace constant_string_detail
     
@@ -28,9 +39,13 @@ namespace sia
     {
         constant_string_detail::constant_string_data<T, N> m_wrap;
 
-        template <constant_string_detail::Constant_string_req Ty>
-        constexpr constant_string(Ty&& arg) noexcept : m_wrap(arg, std::make_index_sequence<N>()) { }
-        // constexpr constant_string(T (&&arg)[N]) noexcept : m_wrap(arg, std::make_index_sequence<N>()) { }
+        constexpr constant_string(T (&arg)[N]) noexcept : m_wrap(arg, std::make_index_sequence<N>()) { }
+        constexpr constant_string(const constant_string& arg) noexcept : m_wrap(arg.m_wrap, std::make_index_sequence<N>()) { }
+        constexpr constant_string& operator=(const constant_string& arg) noexcept
+        {
+            m_wrap.m_data = arg.m_wrap.m_data;
+            return *this;
+        }
 
         constexpr T* begin(this auto&& self) noexcept { return self.m_wrap.m_data; }
         constexpr T* end(this auto&& self) noexcept { return self.m_wrap.m_data + N; }
