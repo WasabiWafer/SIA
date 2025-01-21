@@ -1,6 +1,6 @@
 #pragma once
 
-#include <bit>
+#include <string>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/utility/type_container.hpp"
@@ -15,7 +15,7 @@ namespace sia
                 constexpr auto comp = [] <typename T> (size_t& arg) constexpr noexcept -> void
                     {
                         T copy { };
-                        if (arg > copy.get_space_size()) { arg = copy.get_space_size(); }
+                        if (arg < copy.get_space_size()) { arg = copy.get_space_size(); }
                     };
                 size_t ret { };
                 (comp.template operator()<Fs>(ret), ...);
@@ -30,7 +30,7 @@ namespace sia
         {
         private:
             using tcon_t = type_container<Ts...>;
-            unsigned_interger_t<1> m_chunk[get_max_space.template operator()<>()];
+            unsigned_interger_t<1> m_chunk[get_max_space.template operator()<Ts...>()];
         public:
             template <size_t Idx>
             constexpr auto& get() noexcept
@@ -41,6 +41,11 @@ namespace sia
 
             template <constant_string Str>
             constexpr auto& get() noexcept
+            {
+                return 0;
+            }
+
+            constexpr auto& get(std::string_view sv) noexcept
             {
                 return 0;
             }
