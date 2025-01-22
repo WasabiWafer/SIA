@@ -43,12 +43,16 @@ namespace sia
         }
         constexpr constant_string& operator=(this auto&& self, const T (&arg)[N]) noexcept
         {
-            for (T* x = self.m_bin, *y = const_cast<T*>(arg); x < (self.m_bin + N); ++x, ++y) { *x = *y; }
+            for (struct {T* x; const T* y;} obj = {self.m_bin, arg}; obj.x < (self.m_bin + N); ++obj.x, ++obj.y) { *obj.x = *obj.y; }
             return self;
         }
 
-        constexpr T* begin(this auto&& self) noexcept { return self.m_bin; }
-        constexpr T* end(this auto&& self) noexcept { return self.m_bin + N; }
+        constexpr       T* begin()  noexcept        { return this->m_bin; }
+        constexpr const T* begin()  const noexcept  { return this->m_bin; }
+        constexpr       T* end()    noexcept        { return this->m_bin + N; }
+        constexpr const T* end()    const noexcept  { return this->m_bin + N; }
+        constexpr std::string_view to_string_view(this auto&& self) noexcept { return std::string_view(self.begin(), N); }
+        constexpr std::string to_string(this auto&& self) noexcept { return std::string(self.begin(), N); }
     };
 
     template <constant_string_detail::Constant_string_req T>
