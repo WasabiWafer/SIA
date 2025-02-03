@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <memory>
 
 #include "SIA/utility/compressed_pair.hpp"
@@ -79,14 +80,6 @@ namespace sia
             m_data_end_point = m_compair.second()->m_data;
         }
 
-        template <typename Ty>
-        constexpr void push_back(Ty&& arg)
-        {
-            if (is_chain_full()) { add_chain(); }
-            *m_data_end_point = std::forward<Ty>(arg);
-            ++m_data_end_point;
-        }
-
         template <typename... Tys>
         constexpr void emplace_back(Tys&&... args)
         {
@@ -94,6 +87,8 @@ namespace sia
             allocator_traits_t::construct(m_compair.first(), m_data_end_point, std::forward<Tys>(args)...);
             ++m_data_end_point;
         }
+        constexpr void push_back(const T& arg) { this->emplace_back(arg); }
+        constexpr void push_back(T&& arg) { this->emplace_back(std::move(arg)); }
 
         template <typename Ty>
         constexpr bool try_pop_back(Ty&& arg) noexcept

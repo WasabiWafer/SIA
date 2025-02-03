@@ -18,16 +18,19 @@ namespace sia
     {
     private:
         using padding_t = align_wrapper_detail::byte_padding<Align - alignof(T)>;
-        T elem;
-
-        align_wrapper(const align_wrapper&) = delete;
-        align_wrapper& operator=(const align_wrapper&) = delete;
+        T m_elem;
     public:
-        constexpr align_wrapper() noexcept : padding_t(), elem() { }
+        constexpr align_wrapper() : m_elem() { }
+        constexpr align_wrapper(const align_wrapper& arg) : m_elem(arg.m_elem) { }
+        constexpr align_wrapper& operator=(const align_wrapper& arg)
+        {
+            this->m_elem = arg.m_elem;
+            return *this;
+        }
         template <typename... Cs>
-        constexpr align_wrapper(Cs&&... args) noexcept : padding_t(), elem(std::forward<Cs>(args)...) { }
-        constexpr T& self(this auto&& self_) noexcept { return self_.elem; }
-        constexpr T* operator->(this auto&& self) noexcept { return &(self.elem); }
+        constexpr align_wrapper(Cs&&... args) : m_elem(std::forward<Cs>(args)...) { }
+        constexpr T& self(this auto&& self_) noexcept { return self_.m_elem; }
+        constexpr T* operator->(this auto&& self) noexcept { return &(self.m_elem); }
     };
 
     template <typename T> using false_share = align_wrapper<T, std::hardware_destructive_interference_size>;

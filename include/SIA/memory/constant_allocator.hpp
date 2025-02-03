@@ -9,7 +9,7 @@ namespace sia
     } // namespace constant_allocator_detail
     
     template <auto E>
-    struct constant_allocator : private constant_allocator_detail::make_data_t<E>
+    struct constant_allocator : public constant_allocator_detail::make_data_t<E>
     {
     private:
         using base_t = constant_allocator_detail::make_data_t<E>;

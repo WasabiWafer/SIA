@@ -21,17 +21,17 @@ namespace sia
     struct compressed_pair final : private T0
     {
     private:
-        T1 sec;
+        T1 m_sec;
     public:
         template <typename... Cs>
-        explicit constexpr compressed_pair(compressed_pair_tag::zero_t, Cs&&... args) noexcept : T0(), sec(std::forward<Cs>(args)...) { }
+        explicit constexpr compressed_pair(compressed_pair_tag::zero_t, Cs&&... args) noexcept : T0(), m_sec(std::forward<Cs>(args)...) { }
         template <typename C, typename... Cs>
-        explicit constexpr compressed_pair(compressed_pair_tag::one_t, C&& arg, Cs&&... args) noexcept : T0(std::forward<C>(arg)), sec(std::forward<Cs>(args)...) { }
+        explicit constexpr compressed_pair(compressed_pair_tag::one_t, C&& arg, Cs&&... args) noexcept : T0(std::forward<C>(arg)), m_sec(std::forward<Cs>(args)...) { }
         constexpr T0& first(this auto&& self) noexcept {
             return self;
         }
         constexpr T1& second(this auto&& self) noexcept {
-            return self.sec;
+            return self.m_sec;
         }
     };
 
@@ -39,18 +39,18 @@ namespace sia
     struct compressed_pair<T0, T1, false> final
     {
     private:
-        T0 fir;
-        T1 sec;
+        T0 m_fir;
+        T1 m_sec;
     public:
         template <typename... Cs>
-        explicit constexpr compressed_pair(compressed_pair_tag::zero_t, Cs&&... args) noexcept : fir(), sec(std::forward<Cs>(args)...) { }
+        explicit constexpr compressed_pair(compressed_pair_tag::zero_t, Cs&&... args) noexcept : m_fir(), m_sec(std::forward<Cs>(args)...) { }
         template <typename C, typename... Cs>
-        explicit constexpr compressed_pair(compressed_pair_tag::one_t, C&& arg, Cs&&... args) noexcept : fir(std::forward<C>(arg)), sec(std::forward<Cs>(args)...) { }
+        explicit constexpr compressed_pair(compressed_pair_tag::one_t, C&& arg, Cs&&... args) noexcept : m_fir(std::forward<C>(arg)), m_sec(std::forward<Cs>(args)...) { }
         constexpr T0& first(this auto&& self) noexcept {
-            return self.fir;
+            return self.m_fir;
         }
         constexpr T1& second(this auto&& self) noexcept {
-            return self.sec;
+            return self.m_sec;
         }
     };
 } // namespace sia

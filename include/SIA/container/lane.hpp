@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <memory>
 
 #include "SIA/internals/types.hpp"
@@ -31,15 +32,11 @@ namespace sia
             m_compair.second() = allocator_traits_t::allocate(m_compair.first(), Size);
             m_end_point = m_compair.second();
             for(auto& elem : arg)
-            {
-                allocator_traits_t::construct(m_compair.first(), m_end_point++, elem);
-            }
+            { allocator_traits_t::construct(m_compair.first(), m_end_point++, elem); }
         }
 
         ~lane()
-        {
-            allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), Size);
-        }
+        { allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), Size); }
 
         constexpr T* begin()                       noexcept { return m_compair.second(); }
         constexpr T* end()                         noexcept { return m_end_point; }
@@ -47,19 +44,6 @@ namespace sia
         constexpr size_t capacity()                noexcept { return Size; }
         constexpr bool is_full()                   noexcept { return size() >= capacity(); }
         constexpr T& operator[](const size_t& idx) noexcept { return *(m_compair.second() + idx); }
-
-        template <typename Ty>
-        constexpr bool try_push_back(Ty&& arg) noexcept
-        {
-            if (size() >= Size) { return false; }
-            else
-            {
-                *m_end_point = std::forward<Ty>(arg);
-                ++m_end_point;
-                return true;
-            }
-        }
-        
         template <typename... Tys>
         constexpr bool try_emplace_back(Tys&&... args) noexcept
         {
@@ -71,7 +55,9 @@ namespace sia
                 return true;
             }
         }
-
+        constexpr bool try_push_back(const T& arg) noexcept { return this->try_emplace_back(arg); }
+        constexpr bool try_push_back(T&& arg)      noexcept { return this->try_emplace_back(std::move(arg)); }
+        
         template <typename Ty>
         constexpr bool try_pop_back(Ty&& ret) noexcept
         {

@@ -6,12 +6,7 @@
 #include "SIA/utility/tools.hpp"
 
 namespace sia
-{
-    namespace type_pair_detail
-    {
-        struct fail_type{ };
-    } // namespace type_pair_detail
-    
+{    
     template <size_t Key, typename T>
     struct type_pair
     {
@@ -32,7 +27,7 @@ namespace sia
         struct type_sequence_impl;
 
         template <size_t... Keys, typename... Ts>
-        struct type_sequence_impl<std::index_sequence<Keys...>, Ts...> : type_pair<Keys, Ts>...
+        struct type_sequence_impl<std::index_sequence<Keys...>, Ts...> : public type_pair<Keys, Ts>...
         {
             template <size_t Idx>
             constexpr auto at(this auto&& self) noexcept
@@ -60,7 +55,7 @@ namespace sia
     namespace type_container_detail
     {
         template <typename... Ts>
-        struct type_container_impl : type_sequence<Ts...>
+        struct type_container_impl : public type_sequence<Ts...>
         {
         private:
             using bast_t = type_sequence<Ts...>;
@@ -74,8 +69,8 @@ namespace sia
             template <size_t Idx, typename... Tys>
             constexpr auto insert(this auto&& self) noexcept
             {
-                std::make_index_sequence<Idx> front { };
-                std::make_index_sequence<sizeof...(Ts) - Idx> back { };
+                constexpr std::make_index_sequence<Idx> front { };
+                constexpr std::make_index_sequence<sizeof...(Ts) - Idx> back { };
                 
                 constexpr auto adder = [] <size_t Base, size_t... Indxs> (std::index_sequence<Indxs...>) constexpr noexcept -> auto
                     { return std::index_sequence<(Base + Indxs)...>(); };
@@ -107,10 +102,7 @@ namespace sia
                 size_t ret { };
                 constexpr auto run = [] <typename Typ> (size_t& arg) constexpr noexcept -> auto
                     {
-                        if (Callable.template operator()<Typ>())
-                        { ++arg; }
-                        else
-                        { }
+                        if (Callable.template operator()<Typ>()) { ++arg; }
                     };
                 (run.template operator()<Ts>(ret), ...);
                 return ret;
@@ -125,7 +117,7 @@ namespace sia
             template <size_t... Idxs>
             constexpr auto remove(this auto&& self) noexcept
             {
-                std::make_index_sequence<sizeof...(Ts)> loop_seq { };
+                constexpr std::make_index_sequence<sizeof...(Ts)> loop_seq { };
 
                 constexpr auto count_remove_impl = [] (size_t arg0, size_t& arg1) constexpr noexcept -> auto
                     {
@@ -139,7 +131,7 @@ namespace sia
                         return ret;
                     };
 
-                std::make_index_sequence<sizeof...(Ts) - count_remove(loop_seq)> remove_run_seq { };
+                constexpr std::make_index_sequence<sizeof...(Ts) - count_remove(loop_seq)> remove_run_seq { };
 
                 constexpr auto is_remove_target = [] (size_t arg) constexpr noexcept -> auto
                     {
@@ -162,7 +154,7 @@ namespace sia
                     };
                 constexpr auto gen_container_impl = [get_n_th_idx] <size_t Nth, size_t... Indxs> (std::index_sequence<Indxs...> l_seq) constexpr noexcept -> auto
                     {
-                        constexpr type_container_impl copy { };
+                        constexpr type_sequence<Ts...> copy { };
                         return copy.template at<get_n_th_idx.template operator()<Nth>(l_seq)>();
                     };
                 constexpr auto gen_container = [gen_container_impl] <size_t... Indxs0, size_t... Indxs1> (std::index_sequence<Indxs0...> r_seq, std::index_sequence<Indxs1...> l_seq) constexpr noexcept -> auto

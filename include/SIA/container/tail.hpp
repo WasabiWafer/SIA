@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <memory>
 
 #include "SIA/internals/types.hpp"
@@ -56,24 +57,6 @@ namespace sia
         }
 
     public:
-        template <typename Ty>
-        constexpr void push_front(Ty&& arg)
-        {
-            data_t* new_block { };
-            if (m_saved != nullptr) 
-            {
-                new_block = m_saved;
-                m_saved = m_saved->m_next;
-            }
-            else
-            {
-                new_block = allocator_traits_t::allocate(m_compair.first(), 1);
-            }
-            new_block->m_next = m_compair.second();
-            new_block->m_data = std::forward<Ty>(arg);
-            m_compair.second() = new_block;
-        }
-
         template <typename... Tys>
         constexpr void emplace_front(Tys&&... args)
         {
@@ -90,7 +73,9 @@ namespace sia
             allocator_traits_t::construct(m_compair.first(), new_block, m_compair.second(), std::forward<Tys>(args)...);
             m_compair.second() = new_block;
         }
-
+        constexpr void push_front(const T& arg) { this->emplace_front(arg); }
+        constexpr void push_front(T&& arg) { this->emplace_front(std::move(arg)); }
+        
         template <typename Ty>
         constexpr bool try_pop_front(Ty&& ret)
         {

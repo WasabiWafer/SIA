@@ -1,52 +1,144 @@
 #pragma once
 
 #include <memory>
+#include <span>
 
 #include "SIA/internals/types.hpp"
+#include "SIA/utility/tools.hpp"
 #include "SIA/utility/compressed_pair.hpp"
 
 namespace sia
 {
+    namespace ring_detail
+    {
+        template <typename T>
+        struct ring_composition
+        {
+            T* m_data;
+            size_t m_begin;
+            size_t m_end;
+        };
+    } // namespace sia
+    
     template <typename T , size_t Size, typename Allocator = std::allocator<T>>
-    struct ring {
+    struct ring
+    {
     private:
+        using composition_t = ring_detail::ring_composition<T>;
         using allocator_traits_t = std::allocator_traits<Allocator>;
-        compressed_pair<Allocator, T*> m_compair;
 
+        compressed_pair<Allocator, composition_t> m_compair;
     public:
         constexpr ring(const Allocator& alloc = Allocator())
-            : m_compair(compressed_pair_tag::one, alloc, nullptr)
+            : m_compair(compressed_pair_tag::one, alloc, nullptr, 0, 0)
         {
-            m_compair.second() = allocator_traits_t::allocate(m_compair.first(), Size);
-            for (auto& elem : *this) { allocator_traits_t::construct(m_compair.first(), &elem); }
+            auto& allocator = this->m_compair.first();
+            auto& comp = this->m_compair.second();
+            comp.m_data = allocator_traits_t::allocate(allocator, Size);
         }
 
-        constexpr ring(std::initializer_list<T> arg, const Allocator& alloc = Allocator()) noexcept
-            : m_compair(compressed_pair_tag::one, alloc, nullptr)
+        constexpr ring(const std::initializer_list<T>& arg, const Allocator& alloc = Allocator())
+            : m_compair(compressed_pair_tag::one, alloc, nullptr, 0, 0)
         {
-            static_assert(arg.size() <= Size);
-            m_compair.second() = allocator_traits_t::allocate(m_compair.first(), Size);
-            auto target = m_compair.second();
+            assertm(arg.size() <= Size, "Error : initialize with oversize.");
+            auto& allocator = this->m_compair.first();
+            auto& comp = this->m_compair.second();
+            comp.m_data = allocator_traits_t::allocate(allocator, Size);
             for (auto& elem : arg)
             {
-                allocator_traits_t::construct(m_compair.first(), target++, elem);
+                allocator_traits_t::construct(allocator, comp.m_data + comp.m_end, elem);
+                ++comp.m_end;
             }
         }
 
         ~ring()
         {
-            if (m_compair.second() != nullptr) {
-                allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), Size);
-            }
+            auto& allocator = this->m_compair.first();
+            auto& comp = this->m_compair.second();
+            if (m_compair.second().m_data != nullptr)
+            { allocator_traits_t::deallocate(allocator, comp.m_data, Size); }
+        }
+
+        [[nodiscard]]
+        constexpr T& operator[](this auto&& self, size_t idx) noexcept
+        {
+            auto& comp = self.m_compair.second();
+            return *(comp.m_data + ((comp.m_begin + idx) % self.capacity()));
         }
 
         constexpr size_t capacity(this auto&& self) noexcept { return Size; }
-        constexpr Allocator& get_alloc() noexcept { return m_compair.first(); }
-        constexpr T* begin(this auto&& self) noexcept { return self.m_compair.second(); }
-        constexpr T* end(this auto&& self) noexcept { return self.begin() + Size; }
-        constexpr T& operator[](this auto&& self, size_t pos) noexcept { return self.begin()[pos % Size]; }
-        constexpr T* address(this auto&& self, size_t pos) noexcept { return self.begin() + (pos % Size); }
-        template <typename... Cs> constexpr void emplace(size_t pos, Cs&&... args) noexcept { allocator_traits_t::construct(m_compair.first(), address(pos), std::forward<Cs>(args)...); }
-        template <typename C> constexpr void push(size_t pos, C&& arg) noexcept { operator[](pos) = std::forward<C>(arg); }
+        constexpr size_t size(this auto&& self) noexcept
+        {
+            auto& comp = self.m_compair.second();
+            return comp.m_end - comp.m_begin;
+        }
+        constexpr bool is_full(this auto&& self)    noexcept { return self.size() == self.capacity(); }
+        constexpr bool is_empty(this auto&& self)   noexcept { return self.size() == 0; }
+
+        [[nodiscard]]
+        constexpr T& at(size_t idx)
+        {
+            assertm(idx < this->size(), "Error : access violation");
+            auto& comp = this->m_compair.second();
+            return *(comp.m_data + ((comp.m_begin + idx) % this->capacity()));
+        }
+        
+        template <typename... Tys>
+        constexpr bool try_emplace_back(Tys&&... args) noexcept
+        {
+            if (this->is_full()) { return false; }
+            else
+            {
+                auto& alloc = this->m_compair.first();
+                auto& comp = this->m_compair.second();
+                allocator_traits_t::construct(alloc, comp.m_data + (comp.m_end % this->capacity()), std::forward<Tys>(args)...);
+                ++comp.m_end;
+                return true;
+            }
+        }
+        constexpr bool try_push_back(const T& arg)  noexcept { return this->try_emplace_back(arg); }
+        constexpr bool try_push_back(T&& arg)       noexcept { return this->try_emplace_back(std::move(arg)); }
+        constexpr void pop_front(this auto&& self) noexcept
+        {
+            auto& alloc = self.m_compair.first();
+            auto& comp = self.m_compair.second();
+            if (!self.is_empty())
+            {
+                allocator_traits_t::destroy(alloc, comp.m_data + (comp.m_begin % self.capacity()));
+                ++comp.m_begin;
+            }
+        }
+
+        [[nodiscard]]
+        constexpr T& back()
+        {
+            assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
+            auto& comp = this->m_compair.second();
+            return *(comp.m_data + ((comp.m_end - 1) % this->capacity()));
+        }
+
+        [[nodiscard]]
+        constexpr const T& back() const
+        {
+            assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
+            auto& comp = this->m_compair.second();
+            return *(comp.m_data + ((comp.m_end - 1) % this->capacity()));
+        }
+        
+        [[nodiscard]]
+        constexpr T& front()
+        {
+            assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
+            auto& comp = this->m_compair.second();
+            return *(comp.m_data + (comp.m_begin) % this->capacity());
+        }
+
+        [[nodiscard]]
+        constexpr const T& front() const
+        {
+            assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
+            auto& comp = this->m_compair.second();
+            return *(comp.m_data + (comp.m_begin) % this->capacity());
+        }
     };
 } // namespace sia

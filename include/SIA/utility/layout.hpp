@@ -43,7 +43,7 @@ namespace sia
             template <size_t Idx>
             constexpr auto& get(this auto&& self) noexcept
             {
-                target_frame<Idx> fr { };
+                constexpr target_frame<Idx> fr { };
                 return *reinterpret_cast<target_type<Idx>*>(self.m_bin + fr.pos());
             }
 
@@ -81,13 +81,11 @@ namespace sia
         constexpr std::string_view  name_sv(this auto&& self)   noexcept { return Name.to_string_view(); }
         constexpr size_t pos(this auto&& self) noexcept { return Pos; }
         constexpr size_t space_size(this auto&& self) noexcept { return Pos + sizeof(Type); }
-        constexpr layout_detail::unique verify() noexcept { return layout_detail::unique(); }
+        constexpr layout_detail::unique verify(this auto&& self) noexcept { return layout_detail::unique(); }
     };
 
     template <typename... Fs>
         requires is_same_all_v<layout_detail::unique, decltype(std::declval<Fs>().verify())...>
     struct layout : public layout_detail::layout_impl<type_container<Fs...>>
-    {
-        
-    };
+    { };
 } // namespace sia

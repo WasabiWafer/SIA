@@ -1,9 +1,12 @@
 #pragma once
 
 #include <type_traits>
+#include <cassert>
 #include <memory>
 
 #include "SIA/internals/types.hpp"
+
+#define assertm(exp, msg) assert((void(msg), exp))
 
 namespace sia
 {
