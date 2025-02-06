@@ -21,74 +21,96 @@ namespace sia
                 : m_next(next), m_data(std::forward<Tys>(args)...)
             { }
         };
+
+        template <typename T>
+        struct tail_composition
+        {
+            tail_data<T>* m_data;
+            tail_data<T>* m_buffer;
+        };
     } // namespace tail_detail
     
     template <typename T, typename Allocator = std::allocator<T>>
     struct tail
     {
     private:
+        using composition_t = tail_detail::tail_composition<T>;
         using data_t = tail_detail::tail_data<T>;
-        using tail_data_alloc = std::allocator_traits<Allocator>::template rebind_alloc<data_t>;
-        using allocator_traits_t = std::allocator_traits<tail_data_alloc>;
+        using tail_data_allocator = std::allocator_traits<Allocator>::template rebind_alloc<data_t>;
+        using allocator_traits_t = std::allocator_traits<tail_data_allocator>;
 
-        compressed_pair<tail_data_alloc, data_t*> m_compair;
-        data_t* m_saved;
+        compressed_pair<tail_data_allocator, composition_t> m_compair;
 
     public:
         constexpr tail(const Allocator& alloc = Allocator())
-            : m_compair(compressed_pair_tag::one, alloc, nullptr), m_saved(nullptr)
+            : m_compair(compressed_pair_tag::one, alloc, nullptr, nullptr)
         { }
 
         ~tail()
         {
-            deallocate_proc(m_compair.second());
-            deallocate_proc(m_saved);
+            auto& comp = m_compair.second();
+            deallocate_proc(comp.m_data);
+            deallocate_proc(comp.m_buffer);
         }
 
     private:
         constexpr void deallocate_proc(data_t* start_pos)
         {
+            auto& allocator = this->m_compair.first();
             while(start_pos != nullptr)
             {
                 data_t* tmp_pos = start_pos;
                 start_pos = start_pos->m_next;
-                allocator_traits_t::deallocate(m_compair.first(), tmp_pos, 1);
+                allocator_traits_t::deallocate(allocator, tmp_pos, 1);
             }
         }
 
     public:
+        constexpr bool is_empty() noexcept
+        {
+            auto& comp = this->m_compair.second();
+            return comp.m_data == nullptr;
+        }
+
         template <typename... Tys>
         constexpr void emplace_front(Tys&&... args)
         {
+            auto& allocator = this->m_compair.first();
+            auto& comp = this->m_compair.second();
             data_t* new_block { };
-            if (m_saved != nullptr) 
+            if (comp.m_buffer != nullptr) 
             {
-                new_block = m_saved;
-                m_saved = m_saved->m_next;
+                new_block = comp.m_buffer;
+                comp.m_buffer = comp.m_buffer->m_next;
             }
             else
             {
-                new_block = allocator_traits_t::allocate(m_compair.first(), 1);
+                new_block = allocator_traits_t::allocate(allocator, 1);
             }
-            allocator_traits_t::construct(m_compair.first(), new_block, m_compair.second(), std::forward<Tys>(args)...);
-            m_compair.second() = new_block;
+            allocator_traits_t::construct(allocator, new_block, comp.m_data, std::forward<Tys>(args)...);
+            comp.m_data = new_block;
         }
         constexpr void push_front(const T& arg) { this->emplace_front(arg); }
-        constexpr void push_front(T&& arg) { this->emplace_front(std::move(arg)); }
-        
-        template <typename Ty>
-        constexpr bool try_pop_front(Ty&& ret)
+        constexpr void push_front(T&& arg)      { this->emplace_front(std::move(arg)); }
+        constexpr void pop_front()
         {
-            if (m_compair.second() == nullptr) { return false; }
-            else
+            auto& allocator = this->m_compair.first();
+            auto& comp = this->m_compair.second();
+            if (!this->is_empty())
             {
-                data_t* out_block = m_compair.second();
-                m_compair.second() = out_block->m_next;
-                out_block->m_next = m_saved;
-                m_saved = out_block;
-                ret = std::move(out_block->m_data);
-                return true;
+                data_t* out_block = comp.m_data;
+                comp.m_data = comp.m_data->m_next;
+                out_block->m_next = comp.m_buffer;
+                comp.m_buffer = out_block;
+                allocator_traits_t::destroy(allocator, out_block);
             }
+        }
+
+        [[nodiscard]]
+        constexpr T& front() noexcept
+        {
+            auto& comp = this->m_compair.second();
+            return comp.m_data->m_data;
         }
     };
 } // namespace sia

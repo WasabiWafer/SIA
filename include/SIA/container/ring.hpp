@@ -1,7 +1,6 @@
 #pragma once
 
 #include <memory>
-#include <span>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/utility/tools.hpp"
@@ -20,7 +19,7 @@ namespace sia
         };
     } // namespace sia
     
-    template <typename T , size_t Size, typename Allocator = std::allocator<T>>
+    template <typename T, size_t Size, typename Allocator = std::allocator<T>>
     struct ring
     {
     private:
@@ -62,6 +61,7 @@ namespace sia
         [[nodiscard]]
         constexpr T& operator[](this auto&& self, size_t idx) noexcept
         {
+            assertm(idx < self.size(), "Error : access violation");
             auto& comp = self.m_compair.second();
             return *(comp.m_data + ((comp.m_begin + idx) % self.capacity()));
         }
@@ -76,7 +76,7 @@ namespace sia
         constexpr bool is_empty(this auto&& self)   noexcept { return self.size() == 0; }
 
         [[nodiscard]]
-        constexpr T& at(size_t idx)
+        constexpr T& at(size_t idx) noexcept
         {
             assertm(idx < this->size(), "Error : access violation");
             auto& comp = this->m_compair.second();
@@ -84,7 +84,7 @@ namespace sia
         }
         
         template <typename... Tys>
-        constexpr bool try_emplace_back(Tys&&... args) noexcept
+        constexpr bool try_emplace_back(Tys&&... args)
         {
             if (this->is_full()) { return false; }
             else
@@ -96,9 +96,9 @@ namespace sia
                 return true;
             }
         }
-        constexpr bool try_push_back(const T& arg)  noexcept { return this->try_emplace_back(arg); }
-        constexpr bool try_push_back(T&& arg)       noexcept { return this->try_emplace_back(std::move(arg)); }
-        constexpr void pop_front(this auto&& self) noexcept
+        constexpr bool try_push_back(const T& arg)  { return this->try_emplace_back(arg); }
+        constexpr bool try_push_back(T&& arg)       { return this->try_emplace_back(std::move(arg)); }
+        constexpr void pop_front(this auto&& self)
         {
             auto& alloc = self.m_compair.first();
             auto& comp = self.m_compair.second();
@@ -110,7 +110,7 @@ namespace sia
         }
 
         [[nodiscard]]
-        constexpr T& back()
+        constexpr T& back() noexcept
         {
             assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
             auto& comp = this->m_compair.second();
@@ -118,7 +118,7 @@ namespace sia
         }
 
         [[nodiscard]]
-        constexpr const T& back() const
+        constexpr const T& back() const noexcept
         {
             assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
             auto& comp = this->m_compair.second();
@@ -126,7 +126,7 @@ namespace sia
         }
         
         [[nodiscard]]
-        constexpr T& front()
+        constexpr T& front() noexcept
         {
             assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
             auto& comp = this->m_compair.second();
@@ -134,7 +134,7 @@ namespace sia
         }
 
         [[nodiscard]]
-        constexpr const T& front() const
+        constexpr const T& front() const noexcept
         {
             assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
             auto& comp = this->m_compair.second();
