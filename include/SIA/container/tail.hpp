@@ -54,6 +54,8 @@ namespace sia
         }
 
     private:
+        constexpr tail_data_allocator& get_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
+        constexpr composition_t& get_composition(this auto&& self) noexcept { return self.m_compair.second(); }
         constexpr void deallocate_proc(data_t* start_pos)
         {
             auto& allocator = this->m_compair.first();
@@ -68,15 +70,15 @@ namespace sia
     public:
         constexpr bool is_empty() noexcept
         {
-            auto& comp = this->m_compair.second();
+            auto& comp = this->get_composition();
             return comp.m_data == nullptr;
         }
 
         template <typename... Tys>
         constexpr void emplace_front(Tys&&... args)
         {
-            auto& allocator = this->m_compair.first();
-            auto& comp = this->m_compair.second();
+            auto& allocator = this->get_allocator();
+            auto& comp = this->get_composition();
             data_t* new_block { };
             if (comp.m_buffer != nullptr) 
             {
@@ -94,8 +96,8 @@ namespace sia
         constexpr void push_front(T&& arg)      { this->emplace_front(std::move(arg)); }
         constexpr void pop_front()
         {
-            auto& allocator = this->m_compair.first();
-            auto& comp = this->m_compair.second();
+            auto& allocator = this->get_allocator();
+            auto& comp = this->get_composition();
             if (!this->is_empty())
             {
                 data_t* out_block = comp.m_data;
@@ -109,8 +111,15 @@ namespace sia
         [[nodiscard]]
         constexpr T& front() noexcept
         {
-            auto& comp = this->m_compair.second();
+            auto& comp = this->get_composition();
             return comp.m_data->m_data;
+        }
+
+        [[nodiscard]]
+        constexpr const T& front() const noexcept
+        {
+            auto& comp = this->get_composition();
+            comp.m_data->m_data;
         }
     };
 } // namespace sia

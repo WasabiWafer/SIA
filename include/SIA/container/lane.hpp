@@ -28,12 +28,15 @@ namespace sia
 
         compressed_pair<Allocator, composition_t> m_compair;
 
+        constexpr Allocator& get_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
+        constexpr composition_t& get_composition(this auto&& self) noexcept { return self.m_compair.second(); }
+        constexpr T* address(this auto&& self, size_t idx) noexcept { return self.get_composition().m_data + idx; }
     public:
         constexpr lane(const Allocator& alloc = Allocator())
             : m_compair(compressed_pair_tag::one, alloc, nullptr, nullptr)
         {
-            auto& allocator = this->m_compair.first();
-            auto& comp = this->m_compair.second();
+            auto& allocator = this->get_allocator();
+            auto& comp = this->get_composition();
             comp.m_data = allocator_traits_t::allocate(allocator, this->capacity());
             comp.m_end = comp.m_data;
         }
@@ -42,8 +45,8 @@ namespace sia
             : m_compair(compressed_pair_tag::one, alloc, nullptr)
         {
             assertm(arg.size() <= Size, "Error : initialize with oversize.");
-            auto& allocator = this->m_compair.first();
-            auto& comp = this->m_compair.second();
+            auto& allocator = this->get_allocator();
+            auto& comp = this->get_composition();
             comp.m_data = allocator_traits_t::allocate(allocator, this->capacity());
             comp.m_end = comp.m_data;
             for(auto& elem : arg)
@@ -55,32 +58,31 @@ namespace sia
 
         ~lane()
         {
-            auto& allocator = this->m_compair.first();
-            auto& comp = this->m_compair.second();
+            auto& allocator = this->get_allocator();
+            auto& comp = this->get_composition();
             allocator_traits_t::deallocate(allocator, comp.m_data, this->capacity());
         }
 
         constexpr T* begin() noexcept
         {
-            auto& comp = this->m_compair.second();
+            auto& comp = this->get_composition();
             return comp.m_data;
         }
         constexpr T* end() noexcept
         {
-            auto& comp = this->m_compair.second();
+            auto& comp = this->get_composition();
             return comp.m_end;
         }
-        constexpr size_t size()     noexcept { return end() - begin(); }
-        constexpr size_t capacity() noexcept { return Size; }
-        constexpr bool is_full()    noexcept { return size() >= capacity(); }
-        constexpr bool is_empty()   noexcept { return size() == 0; }
+        constexpr size_t size(this auto&& self)     noexcept { return self.end() - self.begin(); }
+        constexpr size_t capacity(this auto&& self) noexcept { return Size; }
+        constexpr bool is_full(this auto&& self)    noexcept { return self.size() == self.capacity(); }
+        constexpr bool is_empty(this auto&& self)   noexcept { return self.size() == 0; }
 
         [[nodiscard]]
         constexpr T& operator[](this auto&& self, size_t idx) noexcept
         {
             assertm(idx < self.size(), "Error : access violation");
-            auto& comp = self.m_compair.second();
-            return *(comp.m_data + idx);
+            return *self.address(idx);
         }
 
         template <typename... Tys>
@@ -89,8 +91,8 @@ namespace sia
             if (this->is_full()) { return false; }
             else
             {
-                auto& allocator = this->m_compair.first();
-                auto& comp = this->m_compair.second();
+                auto& allocator = this->get_allocator();
+                auto& comp = this->get_composition();
                 allocator_traits_t::construct(allocator, comp.m_end, std::forward<Tys>(args)...);
                 ++comp.m_end;
                 return true;
@@ -102,8 +104,8 @@ namespace sia
         {
             if (!this->is_empty())
             {
-                auto& allocator = this->m_compair.first();
-                auto& comp = this->m_compair.second();
+                auto& allocator = this->get_allocator();
+                auto& comp = this->get_composition();
                 allocator_traits_t::destroy(allocator, --comp.m_end);
             }
         }
@@ -111,7 +113,7 @@ namespace sia
         [[nodiscard]]
         constexpr T& back() noexcept
         {
-            auto& comp = this->m_compair.second();
+            auto& comp = this->get_composition();
             return *(comp.m_end - 1);
         }
     };
