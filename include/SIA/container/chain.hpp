@@ -134,18 +134,21 @@ namespace sia
         constexpr void push_back(const T& arg) { this->emplace_back(arg); }
         constexpr void push_back(T&& arg) { this->emplace_back(std::move(arg)); }
 
-        constexpr void pop_back()
+        constexpr void pop_back(this auto&& self)
         {
-            if (this->is_chain_empty())
-            { this-> proc_sub_chain(); }
-            if (!this->is_chain_empty())
+            if (self.is_chain_empty())
+            { self. proc_sub_chain(); }
+            if (!self.is_chain_empty())
             {
-                composition_t& comp = this->get_composition();
-                allocator_traits_t::destroy(this->get_allocator(), --comp.m_data_end);
+                composition_t& comp = self.get_composition();
+                allocator_traits_t::destroy(self.get_allocator(), --comp.m_data_end);
             }
         }
 
         [[nodiscard]]
         constexpr T& back(this auto&& self) noexcept { return *self.get_composition().m_data_end; }
+
+        [[nodiscard]]
+        constexpr const T& back(this auto&& self) const noexcept { return *self.get_composition().m_data_end; }
     };
 } // namespace sia

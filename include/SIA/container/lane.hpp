@@ -100,18 +100,25 @@ namespace sia
         }
         constexpr bool try_push_back(const T& arg) { return this->try_emplace_back(arg); }
         constexpr bool try_push_back(T&& arg)      { return this->try_emplace_back(std::move(arg)); }
-        constexpr void pop_back()
+        constexpr void pop_back(this auto&& self)
         {
-            if (!this->is_empty())
+            if (!self.is_empty())
             {
-                auto& allocator = this->get_allocator();
-                auto& comp = this->get_composition();
+                auto& allocator = self.get_allocator();
+                auto& comp = self.get_composition();
                 allocator_traits_t::destroy(allocator, --comp.m_end);
             }
         }
 
         [[nodiscard]]
         constexpr T& back() noexcept
+        {
+            auto& comp = this->get_composition();
+            return *(comp.m_end - 1);
+        }
+
+        [[nodiscard]]
+        constexpr const T& back() const noexcept
         {
             auto& comp = this->get_composition();
             return *(comp.m_end - 1);
