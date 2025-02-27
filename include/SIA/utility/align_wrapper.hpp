@@ -42,7 +42,7 @@ namespace sia
         constexpr align_wrapper(Ty&& arg, Tys&&... args) : m_impl()
         { new(m_impl.get_ptr()) T(std::forward<Ty>(arg), std::forward<Tys>(args)...); }
 
-        ~align_wrapper() { this->m_impl.get_ref()->~T(); }
+        ~align_wrapper() { this->m_impl.get_ref().~T(); }
 
         constexpr auto& ref(this auto&& self) noexcept
         { return self.m_impl.get_ref(); }
