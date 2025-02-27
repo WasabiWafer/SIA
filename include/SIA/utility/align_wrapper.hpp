@@ -27,7 +27,7 @@ namespace sia
     private:
         using impl_t = align_wrapper_detail::align_wrapper_impl<T, Align>;
         impl_t m_impl;
-        
+
     public:
         constexpr align_wrapper() : m_impl() { }
 
@@ -41,6 +41,8 @@ namespace sia
             requires (!std::is_same_v<std::remove_cvref_t<Ty>, align_wrapper>)
         constexpr align_wrapper(Ty&& arg, Tys&&... args) : m_impl()
         { new(m_impl.get_ptr()) T(std::forward<Ty>(arg), std::forward<Tys>(args)...); }
+
+        ~align_wrapper() { this->m_impl.get_ptr()->~T(); }
 
         constexpr auto& ref(this auto&& self) noexcept
         { return self.m_impl.get_ref(); }
