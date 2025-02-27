@@ -1,21 +1,24 @@
 #pragma once
 
-#define splits_gen_01(name) enum class name##_t { }; constexpr auto name##_v = name##_t{ };
-#define splits_gen_05(x0, x1, x2, x3, x4) splits_gen_01(x0) splits_gen_01(x1) splits_gen_01(x2) splits_gen_01(x3) splits_gen_01(x4)
-#define splits_gen_10(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9) splits_gen_05(x0, x1, x2, x3, x4) splits_gen_05(x5, x6, x7, x8, x9)
-#define splits_gen_20(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19) splits_gen_10(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9) splits_gen_10(x10, x11, x12, x13, x14, x15, x16, x17, x18, x19)
-
 namespace sia
 {
     namespace splits
     {
-        splits_gen_10(zero, one, two, three, four, five, six, seven, eight, nine)
-        splits_gen_20(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
-        splits_gen_05(u, v, w, x, y)
-        splits_gen_01(z)
-        splits_gen_20(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T)
-        splits_gen_05(U, V, W, X, Y)
-        splits_gen_01(Z)
+        #define SIA_MACRO_SPLITS_GEN_01(name) enum class name##_t { }; constexpr name##_t name##_v = name##_t{ };
+        #define SIA_MACRO_SPLITS_GEN_05(x0, x1, x2, x3, x4) SIA_MACRO_SPLITS_GEN_01(x0) SIA_MACRO_SPLITS_GEN_01(x1) SIA_MACRO_SPLITS_GEN_01(x2) SIA_MACRO_SPLITS_GEN_01(x3) SIA_MACRO_SPLITS_GEN_01(x4)
+        #define SIA_MACRO_SPLITS_GEN_10(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9) SIA_MACRO_SPLITS_GEN_05(x0, x1, x2, x3, x4) SIA_MACRO_SPLITS_GEN_05(x5, x6, x7, x8, x9)
+        #define SIA_MACRO_SPLITS_GEN_20(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19) SIA_MACRO_SPLITS_GEN_10(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9) SIA_MACRO_SPLITS_GEN_10(x10, x11, x12, x13, x14, x15, x16, x17, x18, x19)
+        SIA_MACRO_SPLITS_GEN_10(zero, one, two, three, four, five, six, seven, eight, nine)
+        SIA_MACRO_SPLITS_GEN_20(a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t)
+        SIA_MACRO_SPLITS_GEN_05(u, v, w, x, y)
+        SIA_MACRO_SPLITS_GEN_01(z)
+        SIA_MACRO_SPLITS_GEN_20(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T)
+        SIA_MACRO_SPLITS_GEN_05(U, V, W, X, Y)
+        SIA_MACRO_SPLITS_GEN_01(Z)
+        #undef SIA_MACRO_SPLITS_GEN01
+        #undef SIA_MACRO_SPLITS_GEN05
+        #undef SIA_MACRO_SPLITS_GEN10
+        #undef SIA_MACRO_SPLITS_GEN20
     } // namespace partition
 } // namespace sia
 
@@ -84,8 +87,8 @@ namespace sia
 {
     namespace stamps
     {
-        constexpr auto os = stamps_detail::get_os();
-        constexpr auto os_bit = stamps_detail::get_os_bit();
-        constexpr auto arch = stamps_detail::get_architecture();
+        constexpr auto os_V = stamps_detail::get_os();
+        constexpr auto os_bit_v = stamps_detail::get_os_bit();
+        constexpr auto arch_v = stamps_detail::get_architecture();
     } // namespace stamps
 } // namespace sia

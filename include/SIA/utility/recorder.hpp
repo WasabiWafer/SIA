@@ -11,7 +11,7 @@ namespace sia
         enum class time_unit { nanoseconds, microseconds, milliseconds, seconds, minutes, hours};
     } // namespace tags
     
-    namespace timer_detail
+    namespace recorder_detail
     {
         template <tags::time_unit Tag, typename Rep = float>
         struct time_exp;
@@ -29,9 +29,9 @@ namespace sia
         struct time_exp<tags::time_unit::hours, Rep> { using type = std::chrono::duration<float, std::ratio<3600>>; };
         template <tags::time_unit Tag, typename Rep = float>
         using time_exp_t = time_exp<Tag, Rep>::type;
-    } // namespace timer_detail
+    } // namespace recorder_detail
     
-    struct single_timer
+    struct single_recorder
     {
     private:
         using clock_t = std::chrono::high_resolution_clock;
@@ -42,6 +42,6 @@ namespace sia
         void set() noexcept { m_record[0] = clock_t::now(); }
         void now() noexcept { m_record[1] = clock_t::now(); }
         template <tags::time_unit Tag, typename Rep = float>
-        auto reuslt() noexcept { return timer_detail::time_exp_t<Tag, Rep>(m_record[1] - m_record[0]); }
+        auto reuslt() noexcept { return recorder_detail::time_exp_t<Tag, Rep>(m_record[1] - m_record[0]); }
     };
 } // namespace sia
