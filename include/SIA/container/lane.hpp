@@ -33,7 +33,7 @@ namespace sia
         constexpr T* address(this auto&& self, size_t idx) noexcept { return self.get_composition().m_data + idx; }
     public:
         constexpr lane(const Allocator& alloc = Allocator())
-            : m_compair(compressed_pair_tag::one, alloc, nullptr, nullptr)
+            : m_compair(splits::one_v, alloc, nullptr, nullptr)
         {
             auto& allocator = this->get_allocator();
             auto& comp = this->get_composition();
@@ -42,7 +42,7 @@ namespace sia
         }
 
         constexpr lane(std::initializer_list<T> arg, const Allocator& alloc = Allocator())
-            : m_compair(compressed_pair_tag::one, alloc, nullptr)
+            : m_compair(splits::one_v, alloc, nullptr)
         {
             assertm(arg.size() <= Size, "Error : initialize with oversize.");
             auto& allocator = this->get_allocator();

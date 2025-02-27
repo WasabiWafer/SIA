@@ -12,7 +12,6 @@ namespace sia
         template <>             struct byte_padding<0>  { };
     } // namespace align_wrapper_detail
     
-    //align_wrapper
     template <typename T, size_t Align> requires (alignof(T) <= Align)
     struct align_wrapper : private align_wrapper_detail::byte_padding<Align - alignof(T)>
     {

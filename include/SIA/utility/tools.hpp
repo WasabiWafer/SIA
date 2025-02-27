@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "SIA/internals/types.hpp"
+#include "SIA/internals/define.hpp"
 
 #define assertm(exp, msg) assert((void(msg), exp))
 
@@ -35,13 +36,11 @@ namespace sia
     template <auto... Es>
     struct entity_list { using type = entity_list; };
     
-    enum class chunk_tag { heap, stack };
-
-    template <typename T, size_t N, chunk_tag Tag = chunk_tag::stack, typename Allocator = std::allocator<T>>
+    template <typename T, size_t N, tags::memory_locations Tag = tags::memory_locations::stack, typename Allocator = std::allocator<T>>
     struct chunk;
     
     template <typename T, size_t N, typename Allocator>
-    struct chunk<T, N, chunk_tag::heap, Allocator>
+    struct chunk<T, N, tags::memory_locations::heap, Allocator>
     {
         private:
         using allocator_traits_t = std::allocator_traits<Allocator>;
@@ -53,5 +52,5 @@ namespace sia
     };
 
     template <typename T, size_t N>
-    struct chunk<T, N, chunk_tag::stack> { T m_bin[N]; };
+    struct chunk<T, N, tags::memory_locations::stack> { T m_bin[N]; };
 } // namespace sia

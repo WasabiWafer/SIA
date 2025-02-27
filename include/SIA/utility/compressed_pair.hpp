@@ -2,21 +2,10 @@
 
 #include <type_traits>
 
+#include "SIA/internals/define.hpp"
+
 namespace sia
-{
-    namespace compressed_pair_tag
-    {
-        namespace tag_detail
-        {
-            enum class zero{ };
-            enum class one{ };
-        } // namespace tag_detail
-        using zero_t = tag_detail::zero;
-        using one_t = tag_detail::one;
-        constexpr auto zero = tag_detail::zero{ };
-        constexpr auto one = tag_detail::one{ };
-    } // namespace composit_pait_tag
-    
+{    
     template <typename T0, typename T1, bool = std::is_empty_v<T0> && !std::is_final_v<T0>>
     struct compressed_pair final : private T0
     {
@@ -24,9 +13,9 @@ namespace sia
         T1 m_sec;
     public:
         template <typename... Cs>
-        explicit constexpr compressed_pair(compressed_pair_tag::zero_t, Cs&&... args) noexcept : T0(), m_sec(std::forward<Cs>(args)...) { }
+        explicit constexpr compressed_pair(splits::zero_t, Cs&&... args) noexcept : T0(), m_sec(std::forward<Cs>(args)...) { }
         template <typename C, typename... Cs>
-        explicit constexpr compressed_pair(compressed_pair_tag::one_t, C&& arg, Cs&&... args) noexcept : T0(std::forward<C>(arg)), m_sec(std::forward<Cs>(args)...) { }
+        explicit constexpr compressed_pair(splits::one_t, C&& arg, Cs&&... args) noexcept : T0(std::forward<C>(arg)), m_sec(std::forward<Cs>(args)...) { }
         constexpr T0& first(this auto&& self) noexcept {
             return self;
         }
@@ -43,9 +32,9 @@ namespace sia
         T1 m_sec;
     public:
         template <typename... Cs>
-        explicit constexpr compressed_pair(compressed_pair_tag::zero_t, Cs&&... args) noexcept : m_fir(), m_sec(std::forward<Cs>(args)...) { }
+        explicit constexpr compressed_pair(splits::zero_t, Cs&&... args) noexcept : m_fir(), m_sec(std::forward<Cs>(args)...) { }
         template <typename C, typename... Cs>
-        explicit constexpr compressed_pair(compressed_pair_tag::one_t, C&& arg, Cs&&... args) noexcept : m_fir(std::forward<C>(arg)), m_sec(std::forward<Cs>(args)...) { }
+        explicit constexpr compressed_pair(splits::one_t, C&& arg, Cs&&... args) noexcept : m_fir(std::forward<C>(arg)), m_sec(std::forward<Cs>(args)...) { }
         constexpr T0& first(this auto&& self) noexcept {
             return self.m_fir;
         }

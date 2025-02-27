@@ -43,7 +43,7 @@ namespace sia
 
     public:
         constexpr tail(const Allocator& alloc = Allocator())
-            : m_compair(compressed_pair_tag::one, alloc, nullptr, nullptr)
+            : m_compair(splits::one_v, alloc, nullptr, nullptr)
         { }
 
         ~tail()

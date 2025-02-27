@@ -105,7 +105,7 @@ namespace sia
 
     public:
         constexpr chain(const Allocator& alloc = Allocator())
-            : m_compair(compressed_pair_tag::one, alloc, compressed_pair_tag::one, alloc, nullptr, nullptr, nullptr, nullptr)
+            : m_compair(splits::one_v, alloc, splits::one_v, alloc, nullptr, nullptr, nullptr, nullptr)
         {
             composition_t& comp = get_composition();
             comp.m_data = allocator_traits_data_t::allocate(get_chain_allocator(), 1);

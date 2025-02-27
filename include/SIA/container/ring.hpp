@@ -52,7 +52,7 @@ namespace sia
         }
     public:
         constexpr ring(const Allocator& alloc = Allocator())
-            : m_compair(compressed_pair_tag::one, alloc, nullptr, 0, 0)
+            : m_compair(splits::one_v, alloc, nullptr, 0, 0)
         {
             auto& allocator = this->get_allocator();
             composition_t& comp = this->get_composition();
@@ -60,7 +60,7 @@ namespace sia
         }
 
         constexpr ring(const std::initializer_list<T>& arg, const Allocator& alloc = Allocator())
-            : m_compair(compressed_pair_tag::one, alloc, nullptr, 0, 0)
+            : m_compair(splits::one_v, alloc, nullptr, 0, 0)
         {
             assertm(arg.size() <= Size, "Error : initialize with oversize.");
             auto& allocator = this->get_allocator();

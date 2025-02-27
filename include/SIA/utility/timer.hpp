@@ -6,72 +6,42 @@
 
 namespace sia
 {
-    struct timer
+    namespace tags
     {
-        using tp_t = decltype(std::chrono::high_resolution_clock::now());
-
-        tp_t init;
-        std::vector<tp_t> point;
-
-        timer() : init(std::chrono::high_resolution_clock::now()), point() { }
-
-        constexpr tp_t& operator[](const size_t pos) { return point[pos]; }
-        auto now() noexcept { point.emplace_back(std::chrono::high_resolution_clock::now()); }
-        template <typename Duration_t = std::chrono::milliseconds>
-        auto get(const size_t pos) noexcept { return std::chrono::duration_cast<Duration_t>(point[pos] - init); }
-    };
-
+        enum class time_unit { nanoseconds, microseconds, milliseconds, seconds, minutes, hours};
+    } // namespace tags
+    
+    namespace timer_detail
+    {
+        template <tags::time_unit Tag, typename Rep = float>
+        struct time_exp;
+        template <typename Rep>
+        struct time_exp<tags::time_unit::nanoseconds, Rep> { using type = std::chrono::duration<float, std::nano>; };
+        template <typename Rep>
+        struct time_exp<tags::time_unit::microseconds, Rep> { using type = std::chrono::duration<float, std::micro>; };
+        template <typename Rep>
+        struct time_exp<tags::time_unit::milliseconds, Rep> { using type = std::chrono::duration<float, std::milli>; };
+        template <typename Rep>
+        struct time_exp<tags::time_unit::seconds, Rep> { using type = std::chrono::duration<float>; };
+        template <typename Rep>
+        struct time_exp<tags::time_unit::minutes, Rep> { using type = std::chrono::duration<float, std::ratio<60>>; };
+        template <typename Rep>
+        struct time_exp<tags::time_unit::hours, Rep> { using type = std::chrono::duration<float, std::ratio<3600>>; };
+        template <tags::time_unit Tag, typename Rep = float>
+        using time_exp_t = time_exp<Tag, Rep>::type;
+    } // namespace timer_detail
+    
     struct single_timer
     {
-        using tp_t = decltype(std::chrono::high_resolution_clock::now());
-
-        tp_t init;
-        tp_t point;
-
-        single_timer() : init(std::chrono::high_resolution_clock::now()), point(init) { }
-
-        auto now() noexcept { point = std::chrono::high_resolution_clock::now(); }
-        template <typename Duration_t = std::chrono::milliseconds>
-        auto get() noexcept { return std::chrono::duration_cast<Duration_t>(point - init); }
-    };
-} // namespace sia
-
-
-namespace sia
-{
-    template <size_t RunCount>
-    struct runner
-    {
-        timer tm;
-
-        template <typename F>
-        constexpr void measurement(F&& func) noexcept
-        {
-            tm.now();
-            for(size_t count {0}; count < RunCount; ++count) { func(); }
-            tm.now();
-        }
-
-        template <typename Duration_t = std::chrono::nanoseconds>
-        constexpr void result() noexcept
-        {
-            for (size_t count{0}; count < (tm.point.size() / 2); ++count)
-            {
-                if (count == 0)
-                {
-                    std::print("Function {} : {}\n", count, std::chrono::duration_cast<Duration_t>(tm[count + 1] - tm[count]));
-                }
-                else
-                {
-                    auto before = std::chrono::duration_cast<Duration_t>(tm[(count * 2) - 1] - tm[(count * 2) - 2]);
-                    auto cur = std::chrono::duration_cast<Duration_t>(tm[(count * 2) + 1] - tm[(count * 2)]);
-                    double percent = (1.0l - static_cast<double>(cur.count())/static_cast<double>(before.count()))*100.0l;
-                    std::print("Function {} : {} ({:.3f} %)\n", count, cur, percent);
-                }
-            }
-        }
-
-        template <typename... Fs>
-        constexpr runner(Fs&&... args) : tm() { (measurement(std::forward<Fs>(args)), ...); }
+    private:
+        using clock_t = std::chrono::high_resolution_clock;
+        using tp_t = std::chrono::high_resolution_clock::time_point;
+        tp_t m_record[2];
+        
+    public:
+        void set() noexcept { m_record[0] = clock_t::now(); }
+        void now() noexcept { m_record[1] = clock_t::now(); }
+        template <tags::time_unit Tag, typename Rep = float>
+        auto reuslt() noexcept { return timer_detail::time_exp_t<Tag, Rep>(m_record[1] - m_record[0]); }
     };
 } // namespace sia
