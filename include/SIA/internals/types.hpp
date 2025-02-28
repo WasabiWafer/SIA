@@ -69,14 +69,14 @@ namespace sia
         }
     } // namespace types_detail
 
-    template <size_t Size> using signed_interger_t   = decltype(types_detail::get_integer_type<Size>());
-    template <size_t Size> using unsigned_interger_t = decltype(types_detail::get_unsigned_integer_type<Size>());
+    template <size_t Size> using signed_integer_t   = decltype(types_detail::get_integer_type<Size>());
+    template <size_t Size> using unsigned_integer_t = decltype(types_detail::get_unsigned_integer_type<Size>());
     template <size_t Size> using floating_point_t    = decltype(types_detail::get_floating_type<Size>());
     using largest_size_t    = decltype(types_detail::comp_leeq_ret_large<largest_integer_t, largest_floating_point_t>());
     using smallest_size_t   = decltype(types_detail::comp_leeq_ret_small<smallest_integer_t, smallest_floating_point_t>());
-    using byte_t    = unsigned_interger_t<1>;
-    using word_t    = unsigned_interger_t<2>;
-    using dword_t   = unsigned_interger_t<4>;
-    using qword_t   = unsigned_interger_t<8>;
+    using byte_t    = unsigned_integer_t<1>;
+    using word_t    = unsigned_integer_t<2>;
+    using dword_t   = unsigned_integer_t<4>;
+    using qword_t   = unsigned_integer_t<8>;
 } // namespace sia
 
