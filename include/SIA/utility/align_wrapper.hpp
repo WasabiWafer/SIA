@@ -30,41 +30,50 @@ namespace sia
         impl_t m_impl;
 
     public:
-        constexpr align_wrapper() noexcept(std::is_nothrow_default_constructible_v<T>)
+        constexpr align_wrapper() noexcept(noexcept(T()))
             : m_impl()
         { }
 
-        constexpr align_wrapper(const align_wrapper& arg) noexcept(std::is_nothrow_copy_constructible_v<T>)
+        constexpr align_wrapper(const align_wrapper& arg) noexcept(noexcept(T(arg.ref())))
             : m_impl()
-        { new(this->m_impl.get_ptr()) T(arg.m_impl.get_ref()); }
+        { new(this->ptr()) T(arg.ref()); }
 
-        constexpr align_wrapper(align_wrapper&& arg) noexcept(std::is_nothrow_move_constructible_v<T>)
+        constexpr align_wrapper(align_wrapper&& arg) noexcept(noexcept(T(std::move(arg.ref))))
             : m_impl()
-        { new(this->m_impl.get_ptr()) T(std::move(arg.m_impl.get_ref())); }
+        { new(this->ptr()) T(std::move(arg.ref())); }
 
         template <typename Ty, typename... Tys>
             requires (!std::is_same_v<std::remove_cvref_t<Ty>, align_wrapper>)
         constexpr align_wrapper(Ty&& arg, Tys&&... args) noexcept(noexcept(T(Ty(arg), Tys(args)...)))
             : m_impl()
-        { new(m_impl.get_ptr()) T(std::forward<Ty>(arg), std::forward<Tys>(args)...); }
+        { new(this->ptr()) T(std::forward<Ty>(arg), std::forward<Tys>(args)...); }
 
-        ~align_wrapper() { this->m_impl.get_ref().~T(); }
+        ~align_wrapper() noexcept(noexcept(T().~T()))  { this->ref().~T(); }
 
-        constexpr align_wrapper& operator=(const align_wrapper& arg) noexcept(std::is_nothrow_copy_assignable_v<T>)
+        constexpr align_wrapper& operator=(const align_wrapper& arg) noexcept(noexcept(this->ref() = T(arg.ref())))
         {
-            if (this->ptr != arg.ptr())
-            { this->ref = arg.ref(); }
+            if (this->ptr() != arg.ptr())
+            { this->ref() = arg.ref(); }
             return *this;
         }
 
-        constexpr auto& ref(this auto&& self) noexcept
-        { return self.m_impl.get_ref(); }
+        constexpr T& ref() noexcept
+        { return this->m_impl.get_ref(); }
 
-        constexpr auto ptr(this auto&& self) noexcept
-        { return self.m_impl.get_ptr(); }
+        constexpr const T& ref() const noexcept
+        { return this->m_impl.get_ref(); }
+
+        constexpr T* ptr() noexcept
+        { return this->m_impl.get_ptr(); }
+
+        constexpr const T* ptr() const noexcept
+        { return this->m_impl.get_ptr(); }
         
-        constexpr T* operator->(this auto&& self) noexcept
-        { return self.m_impl.get_ptr(); }
+        constexpr T* operator->() noexcept
+        { return this->m_impl.get_ptr(); }
+
+        constexpr const T* operator->() const noexcept
+        { return this->m_impl.get_ptr(); }
     };
 
     template <typename T> using false_share = align_wrapper<T, std::hardware_destructive_interference_size>;

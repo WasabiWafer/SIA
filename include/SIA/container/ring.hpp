@@ -48,7 +48,7 @@ namespace sia
         constexpr T* end(this auto&& self) noexcept
         {
             composition_t& comp = self.get_composition();
-            return self.address(comp.m_end);
+            return self.raw_address(comp.m_end);
         }
     public:
         constexpr ring(const Allocator& alloc = Allocator())
@@ -111,6 +111,22 @@ namespace sia
         constexpr bool try_push_back(const T& arg)  { return this->try_emplace_back(arg); }
         constexpr bool try_push_back(T&& arg)       { return this->try_emplace_back(std::move(arg)); }
 
+        template <typename... Tys>
+        constexpr bool try_emplace_front(Tys&&... args)
+        {
+            if (this->is_full()) { return false; }
+            else
+            {
+                auto& alloc = this->get_allocator();
+                composition_t& comp = this->get_composition();
+                --comp.m_begin;
+                allocator_traits_t::construct(alloc, this->begin(), std::forward<Tys>(args)...);
+                return true;
+            }
+        }
+        constexpr bool try_push_front(const T& arg)  { return this->try_emplace_front(arg); }
+        constexpr bool try_push_front(T&& arg)       { return this->try_emplace_front(std::move(arg)); }
+
         constexpr void pop_front(this auto&& self)
         {
             auto& alloc = self.get_allocator();
@@ -119,6 +135,17 @@ namespace sia
             {
                 allocator_traits_t::destroy(alloc, self.begin());
                 ++comp.m_begin;
+            }
+        }
+
+        constexpr void pop_back(this auto&& self)
+        {
+            auto& alloc = self.get_allocator();
+            composition_t& comp = self.get_composition();
+            if (!self.is_empty())
+            {
+                --comp.m_end;
+                allocator_traits_t::destroy(alloc, self.end());
             }
         }
         
@@ -134,6 +161,20 @@ namespace sia
         {
             assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
             return *(this->begin());
+        }
+
+        [[nodiscard]]
+        constexpr T& back() noexcept
+        {
+            assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
+            return *(this->end() - 1);
+        }
+
+        [[nodiscard]]
+        constexpr const T& back() const noexcept
+        {
+            assertm(!this->is_empty(), "Error : Get object from Zero size container(ring).");
+            return *(this->end() - 1);
         }
     };
 } // namespace sia

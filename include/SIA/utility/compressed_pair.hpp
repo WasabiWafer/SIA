@@ -13,19 +13,15 @@ namespace sia
         T1 m_sec;
     public:
         template <typename... Cs>
-        explicit constexpr compressed_pair(splits::zero_t, Cs&&... args) noexcept(noexcept(T0()) && noexcept(T1(Cs(args)...)))
+        constexpr compressed_pair(splits::zero_t, Cs&&... args) noexcept(noexcept(T0()) && noexcept(T1(Cs(args)...)))
             : T0(), m_sec(std::forward<Cs>(args)...)
         { }
         template <typename C, typename... Cs>
-        explicit constexpr compressed_pair(splits::one_t, C&& arg, Cs&&... args) noexcept(noexcept(T0(C(arg))) && noexcept(T1(Cs(args)...)))
+        constexpr compressed_pair(splits::one_t, C&& arg, Cs&&... args) noexcept(noexcept(T0(C(arg))) && noexcept(T1(Cs(args)...)))
             : T0(std::forward<C>(arg)), m_sec(std::forward<Cs>(args)...)
         { }
-        constexpr T0& first(this auto&& self) noexcept {
-            return self;
-        }
-        constexpr T1& second(this auto&& self) noexcept {
-            return self.m_sec;
-        }
+        constexpr T0& first(this auto&& self) noexcept { return self; }
+        constexpr T1& second(this auto&& self) noexcept { return self.m_sec; }
     };
 
     template <typename T0, typename T1>
@@ -36,18 +32,14 @@ namespace sia
         T1 m_sec;
     public:
         template <typename... Cs>
-        explicit constexpr compressed_pair(splits::zero_t, Cs&&... args) noexcept(std::is_nothrow_default_constructible_v<T0> && noexcept(T1(Cs(args)...)))
+        constexpr compressed_pair(splits::zero_t, Cs&&... args) noexcept(noexcept(T0()) && noexcept(T1(Cs(args)...)))
             : m_fir(), m_sec(std::forward<Cs>(args)...)
         { }
         template <typename C, typename... Cs>
-        explicit constexpr compressed_pair(splits::one_t, C&& arg, Cs&&... args) noexcept(noexcept(T0(C(arg))) && noexcept(T1(Cs(args)...)))
+        constexpr compressed_pair(splits::one_t, C&& arg, Cs&&... args) noexcept(noexcept(T0(C(arg))) && noexcept(T1(Cs(args)...)))
             : m_fir(std::forward<C>(arg)), m_sec(std::forward<Cs>(args)...)
         { }
-        constexpr T0& first(this auto&& self) noexcept {
-            return self.m_fir;
-        }
-        constexpr T1& second(this auto&& self) noexcept {
-            return self.m_sec;
-        }
+        constexpr T0& first(this auto&& self) noexcept { return self.m_fir; }
+        constexpr T1& second(this auto&& self) noexcept { return self.m_sec; }
     };
 } // namespace sia

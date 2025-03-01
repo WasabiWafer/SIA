@@ -87,7 +87,7 @@ namespace sia
 {
     namespace stamps
     {
-        constexpr auto os_V = stamps_detail::get_os();
+        constexpr auto os_v = stamps_detail::get_os();
         constexpr auto os_bit_v = stamps_detail::get_os_bit();
         constexpr auto arch_v = stamps_detail::get_architecture();
     } // namespace stamps

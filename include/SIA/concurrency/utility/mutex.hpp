@@ -39,7 +39,8 @@ namespace sia
             return false;
         }
 
-        bool try_lock(float time, tags::time_unit unit = tags::time_unit::seconds) noexcept
+        template <tags::time_unit Unit = tags::time_unit::seconds>
+        bool try_lock(float time) noexcept
         {
             constexpr auto mem_order = stamps::memory_orders::seq_cst_v;
             single_recorder st{ };
@@ -50,7 +51,7 @@ namespace sia
                 ret = !m_flag->test_and_set(mem_order);
                 st.now();
             }
-            while ( ret && (0.f < (time - st.reuslt<tags::time_unit::seconds>().count())) );
+            while ( ret && (0.f < (time - st.reuslt<Unit>().count())) );
             return !ret;
         }
         
