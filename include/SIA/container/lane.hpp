@@ -24,53 +24,40 @@ namespace sia
     {
     private:
         using composition_t = lane_detail::lane_composition<T>;
+        using allocator_t = Allocator;
         using allocator_traits_t = std::allocator_traits<Allocator>;
 
         compressed_pair<Allocator, composition_t> m_compair;
 
-        constexpr Allocator& get_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
+        constexpr allocator_t& get_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
         constexpr composition_t& get_composition(this auto&& self) noexcept { return self.m_compair.second(); }
         constexpr T* address(this auto&& self, size_t idx) noexcept { return self.get_composition().m_data + idx; }
+        
     public:
-        constexpr lane(const Allocator& alloc = Allocator())
+        constexpr lane(const allocator_t& alloc = Allocator()) noexcept(noexcept(allocator_traits_t::allocate(this->get_allocator(), this->capacity())))
             : m_compair(splits::one_v, alloc, nullptr, nullptr)
         {
-            auto& allocator = this->get_allocator();
-            auto& comp = this->get_composition();
+            allocator_t& allocator = this->get_allocator();
+            composition_t& comp = this->get_composition();
             comp.m_data = allocator_traits_t::allocate(allocator, this->capacity());
             comp.m_end = comp.m_data;
         }
 
-        constexpr lane(std::initializer_list<T> arg, const Allocator& alloc = Allocator())
-            : m_compair(splits::one_v, alloc, nullptr)
+        ~lane() noexcept(noexcept(allocator_traits_t::deallocate(this->get_allocator(), this->get_composition().m_data, this->capacity())) && noexcept(T().~T()))
         {
-            assertm(arg.size() <= Size, "Error : initialize with oversize.");
-            auto& allocator = this->get_allocator();
-            auto& comp = this->get_composition();
-            comp.m_data = allocator_traits_t::allocate(allocator, this->capacity());
-            comp.m_end = comp.m_data;
-            for(auto& elem : arg)
-            {
-                allocator_traits_t::construct(allocator, comp.m_end, elem);
-                ++comp.m_end;
-            }
-        }
-
-        ~lane()
-        {
-            auto& allocator = this->get_allocator();
-            auto& comp = this->get_composition();
-            allocator_traits_t::deallocate(allocator, comp.m_data, this->capacity());
+            allocator_t& alloc = this->get_allocator();
+            composition_t& comp = this->get_composition();
+            allocator_traits_t::deallocate(alloc, comp.m_data, this->capacity());
         }
 
         constexpr T* begin() noexcept
         {
-            auto& comp = this->get_composition();
+            composition_t& comp = this->get_composition();
             return comp.m_data;
         }
         constexpr T* end() noexcept
         {
-            auto& comp = this->get_composition();
+            composition_t& comp = this->get_composition();
             return comp.m_end;
         }
         constexpr size_t size(this auto&& self)     noexcept { return self.end() - self.begin(); }
@@ -86,41 +73,41 @@ namespace sia
         }
 
         template <typename... Tys>
-        constexpr bool try_emplace_back(Tys&&... args)
+        constexpr bool try_emplace_back(Tys&&... args) noexcept(noexcept(T(std::forward<Tys>(args)...)))
         {
+            allocator_t& allocator = this->get_allocator();
+            composition_t& comp = this->get_composition();
             if (this->is_full()) { return false; }
             else
             {
-                auto& allocator = this->get_allocator();
-                auto& comp = this->get_composition();
                 allocator_traits_t::construct(allocator, comp.m_end, std::forward<Tys>(args)...);
                 ++comp.m_end;
                 return true;
             }
         }
-        constexpr bool try_push_back(const T& arg) { return this->try_emplace_back(arg); }
-        constexpr bool try_push_back(T&& arg)      { return this->try_emplace_back(std::move(arg)); }
-        constexpr void pop_back(this auto&& self)
+        constexpr bool try_push_back(const T& arg) noexcept(noexcept(this->try_emplace_back(arg))) { return this->try_emplace_back(arg); }
+        constexpr bool try_push_back(T&& arg) noexcept(noexcept(this->try_emplace_back(std::move(arg)))) { return this->try_emplace_back(std::move(arg)); }
+        constexpr void pop_back(this auto&& self) noexcept(noexcept(T().~T()))
         {
+            allocator_t& alloc = self.get_allocator();
+            composition_t& comp = self.get_composition();
             if (!self.is_empty())
             {
-                auto& allocator = self.get_allocator();
-                auto& comp = self.get_composition();
-                allocator_traits_t::destroy(allocator, --comp.m_end);
+                allocator_traits_t::destroy(alloc, --comp.m_end);
             }
         }
 
         [[nodiscard]]
         constexpr T& back() noexcept
         {
-            auto& comp = this->get_composition();
+            composition_t& comp = this->get_composition();
             return *(comp.m_end - 1);
         }
 
         [[nodiscard]]
         constexpr const T& back() const noexcept
         {
-            auto& comp = this->get_composition();
+            composition_t& comp = this->get_composition();
             return *(comp.m_end - 1);
         }
     };

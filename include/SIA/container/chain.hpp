@@ -222,7 +222,7 @@ namespace sia
             comp.m_chain_front_data_begin = comp.m_chain_back->m_data;
         }
 
-        ~chain() noexcept(noexcept(T().~T()) && noexcept(this->proc_dealloc(this->get_composition().m_chain_front)))
+        ~chain() noexcept(noexcept(T().~T()) && noexcept(this->proc_dealloc(this->get_composition().m_chain_front)) && noexcept(T().~T()))
         {
             composition_t& comp = this->get_composition();
             this->proc_dealloc(comp.m_chain_front);

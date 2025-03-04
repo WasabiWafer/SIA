@@ -41,7 +41,7 @@ namespace sia
             : m_compair(splits::one_v, alloc, nullptr, nullptr)
         { }
 
-        ~tail() noexcept(noexcept(deallocate_proc(m_compair.second().m_data)))
+        ~tail() noexcept(noexcept(deallocate_proc(m_compair.second().m_data)) && noexcept(T().~T()))
         {
             auto& comp = m_compair.second();
             deallocate_proc(comp.m_data);

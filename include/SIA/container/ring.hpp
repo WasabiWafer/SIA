@@ -76,7 +76,7 @@ namespace sia
             comp.m_data = allocator_traits_t::allocate(this->get_allocator(), Size);
         }
 
-        ~ring() noexcept(noexcept(allocator_traits_t::deallocate(this->get_allocator(), this->get_composition().m_data, Size)))
+        ~ring() noexcept(noexcept(allocator_traits_t::deallocate(this->get_allocator(), this->get_composition().m_data, Size)) && noexcept(T().~T()))
         {
             allocator_t& alloc = this->get_allocator();
             composition_t& comp = this->get_composition();
