@@ -14,12 +14,7 @@ namespace sia
         struct tail_data
         {
             tail_data* m_next;
-            T m_data;
-
-            template <typename... Tys>
-            constexpr tail_data(tail_data* next, Tys&&... args)
-                : m_next(next), m_data(std::forward<Tys>(args)...)
-            { }
+            T* m_data;
         };
 
         template <typename T>
@@ -35,9 +30,12 @@ namespace sia
     {
     private:
         using composition_t = tail_detail::tail_composition<T>;
-        using data_t = tail_detail::tail_data<T>;
-        using tail_data_allocator = std::allocator_traits<Allocator>::template rebind_alloc<data_t>;
-        using allocator_traits_t = std::allocator_traits<tail_data_allocator>;
+        using tail_t = tail_detail::tail_data<T>;
+        using tail_allocator = std::allocator_traits<Allocator>::template rebind_alloc<tail_data_t>;
+        using tail_allocator_traits_t = std::allocator_traits<tail_allocator>;
+        using data_t = T;
+        using data_allocator = Allocator;
+        using data_allocator_traits_t = std::allocator_traits<data_allocator>;
 
         compressed_pair<tail_data_allocator, composition_t> m_compair;
 
@@ -56,12 +54,12 @@ namespace sia
     private:
         constexpr tail_data_allocator& get_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
         constexpr composition_t& get_composition(this auto&& self) noexcept { return self.m_compair.second(); }
-        constexpr void deallocate_proc(data_t* start_pos)
+        constexpr void deallocate_proc(tail_data_t* start_pos)
         {
             auto& allocator = this->m_compair.first();
             while(start_pos != nullptr)
             {
-                data_t* tmp_pos = start_pos;
+                tail_data_t* tmp_pos = start_pos;
                 start_pos = start_pos->m_next;
                 allocator_traits_t::deallocate(allocator, tmp_pos, 1);
             }

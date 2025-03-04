@@ -9,56 +9,48 @@ namespace sia
 {
     namespace chain_detail
     {
-        template <typename T>
+        template <typename T, size_t Size>
         struct chain_data
         {
             chain_data* m_prev;
             chain_data* m_next;
-            T* m_data;
+            T m_data[Size];
         };
 
-        template <typename T>
+        template <typename T, size_t Size>
         struct chain_composition
         {
-            chain_data<T>* m_chain_front;
+            using chain_data_t = chain_data<T, Size>;
+            chain_data_t* m_chain_front;
             T* m_chain_front_data_begin;
-            chain_data<T>* m_chain_back;
+            chain_data_t* m_chain_back;
             T* m_chain_back_data_end;
-            chain_data<T>* m_chain_buffer;
+            chain_data_t* m_chain_buffer;
         };
     } // namespace chain_detail
     
-    template <typename T, size_t Size, typename DataAllocator = std::allocator<T>, typename ChainAllocator = std::allocator<T>>
+    template <typename T, size_t Size, typename Allocator = std::allocator<T>>
         requires (Size >= 1)
     struct chain
     {
     private:
-        using composition_t = chain_detail::chain_composition<T>;
-        using chain_data_t = chain_detail::chain_data<T>;
-
-        using chain_allocator_t = std::allocator_traits<ChainAllocator>::template rebind_alloc<chain_data_t>;
-        using data_allocator_t = DataAllocator;
-
+        using composition_t = chain_detail::chain_composition<T, Size>;
+        using chain_data_t = chain_detail::chain_data<T, Size>;
+        using chain_allocator_t = std::allocator_traits<Allocator>::template rebind_alloc<chain_data_t>;
         using chain_allocator_traits_t = std::allocator_traits<chain_allocator_t>;
-        using data_allocator_traits_t = std::allocator_traits<data_allocator_t>;
 
-        using composition_compair_t = compressed_pair<chain_allocator_t, composition_t>;
-        
-        compressed_pair<data_allocator_t, composition_compair_t> m_compair;
+        compressed_pair<chain_allocator_t, composition_t> m_compair;
 
-        constexpr composition_t& get_composition(this auto&& self) noexcept { return self.m_compair.second().second(); }
-        constexpr data_allocator_t& get_data_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
-        constexpr chain_allocator_t& get_chain_allocator(this auto&& self) noexcept { return self.m_compair.second().first(); }
+        constexpr composition_t& get_composition(this auto&& self) noexcept { return self.m_compair.second(); }
+        constexpr chain_allocator_t& get_chain_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
         constexpr size_t data_capacity(this auto&& self) noexcept { return Size; }
 
         constexpr void proc_dealloc(this auto&& self, chain_data_t* ptr) noexcept
         {
             chain_allocator_t& c_alloc = self.get_chain_allocator();
-            data_allocator_t& d_alloc = self.get_data_allocator();
             while (ptr != nullptr)
             {
                 chain_data_t* next = ptr->m_next;
-                data_allocator_traits_t::deallocate(d_alloc, ptr->m_data, self.data_capacity());
                 chain_allocator_traits_t::deallocate(c_alloc, ptr, 1);
                 ptr = next;
             }
@@ -97,8 +89,8 @@ namespace sia
         constexpr chain_data_t* gen_new_chain_data(this auto&& self)
         {
             chain_data_t* ret = chain_allocator_traits_t::allocate(self.get_chain_allocator(), 1);
-            chain_allocator_traits_t::construct(self.get_chain_allocator(), ret, nullptr, nullptr, nullptr);
-            ret->m_data = data_allocator_traits_t::allocate(self.get_data_allocator(), self.data_capacity());
+            ret->m_prev = nullptr;
+            ret->m_next = nullptr;
             return ret;
         }
 
@@ -180,16 +172,15 @@ namespace sia
 
 
     public:
-        constexpr chain(const DataAllocator& data_alloc = DataAllocator(), const ChainAllocator& chain_alloc = ChainAllocator())
-            : m_compair(splits::one_v, data_alloc, splits::one_v, chain_alloc, nullptr, nullptr, nullptr, nullptr, nullptr)
+        constexpr chain(const chain_allocator_t& chain_alloc = Allocator())
+            : m_compair(splits::one_v, chain_alloc, nullptr, nullptr, nullptr, nullptr, nullptr)
         {
             composition_t& comp = this->get_composition();
             chain_allocator_t& c_alloc = this->get_chain_allocator();
-            data_allocator_t& d_alloc = this->get_data_allocator();
 
             comp.m_chain_front = chain_allocator_traits_t::allocate(c_alloc, 1);
-            chain_allocator_traits_t::construct(c_alloc, comp.m_chain_front, nullptr, nullptr, nullptr);
-            comp.m_chain_front->m_data = data_allocator_traits_t::allocate(d_alloc, this->data_capacity());
+            comp.m_chain_front->m_prev = nullptr;
+            comp.m_chain_front->m_next = nullptr;
 
             comp.m_chain_back = comp.m_chain_front;
             comp.m_chain_back_data_end = comp.m_chain_back->m_data;
@@ -210,22 +201,22 @@ namespace sia
             if (this->is_add_front_stuck())
             { this->chain_push_front(this->get_able_buffer()); }
             --comp.m_chain_front_data_begin;
-            data_allocator_traits_t::construct(this->get_data_allocator(), comp.m_chain_front_data_begin, std::forward<Tys>(args)...);
+            std::construct_at(comp.m_chain_front_data_begin, std::forward<Tys>(args)...);
         }
         constexpr void push_front(const T& arg) noexcept(noexcept(this->emplace_front(arg))) { this->emplace_front(arg); }
         constexpr void push_front(T&& arg) noexcept(noexcept(this->emplace_front(std::move(arg)))) { this->emplace_front(std::move(arg)); }
         constexpr void pop_front() noexcept(noexcept(T().~T()))
         {
             composition_t& comp = this->get_composition();
-            data_allocator_t& d_alloc = this->get_data_allocator();
+
+            if (comp.m_chain_front_data_begin != comp.m_chain_back_data_end)
+            {
+                std::destroy_at(comp.m_chain_front_data_begin);
+                ++comp.m_chain_front_data_begin;
+            }
 
             if (comp.m_chain_front == comp.m_chain_back)
             {
-                if (comp.m_chain_front_data_begin != comp.m_chain_back_data_end)
-                {
-                    data_allocator_traits_t::destroy(d_alloc, comp.m_chain_front_data_begin);
-                    ++comp.m_chain_front_data_begin;
-                }
                 if (comp.m_chain_front_data_begin == comp.m_chain_back_data_end)
                 {
                     comp.m_chain_front_data_begin = comp.m_chain_front->m_data;
@@ -234,11 +225,6 @@ namespace sia
             }
             else
             {
-                if (comp.m_chain_front_data_begin != comp.m_chain_back_data_end)
-                {
-                    data_allocator_traits_t::destroy(d_alloc, comp.m_chain_front_data_begin);
-                    ++comp.m_chain_front_data_begin;
-                }
                 if (!this->is_chain_front_remain())
                 { this->buffer_chain_push_front(this->get_chain_front_pop()); }
             }            
@@ -263,7 +249,7 @@ namespace sia
             composition_t& comp = this->get_composition();
             if (this->is_full_chain_back())
             { this->chain_push_back(this->get_able_buffer()); }
-            data_allocator_traits_t::construct(this->get_data_allocator(), comp.m_chain_back_data_end, std::forward<Tys>(args)...);
+            std::construct_at(comp.m_chain_back_data_end, std::forward<Tys>(args)...);
             ++comp.m_chain_back_data_end;
         }
         constexpr void push_back(const T& arg) noexcept(noexcept(this->emplace_back(arg))) { this->emplace_back(arg); }
@@ -271,14 +257,15 @@ namespace sia
         constexpr void pop_back() noexcept(noexcept(T().~T()))
         {
             composition_t& comp = this->get_composition();
-            data_allocator_t& d_alloc = this->get_data_allocator();
+
+            if (comp.m_chain_front_data_begin != comp.m_chain_back_data_end)
+            {
+                --comp.m_chain_back_data_end;
+                std::destroy_at(comp.m_chain_back_data_end);
+            }
+
             if (comp.m_chain_front == comp.m_chain_back)
             {
-                if (comp.m_chain_front_data_begin != comp.m_chain_back_data_end)
-                {
-                    --comp.m_chain_back_data_end;
-                    data_allocator_traits_t::destroy(d_alloc, comp.m_chain_back_data_end);
-                }
                 if (comp.m_chain_front_data_begin == comp.m_chain_back_data_end)
                 {
                     comp.m_chain_front_data_begin = comp.m_chain_front->m_data;
@@ -287,11 +274,6 @@ namespace sia
             }
             else
             {
-                if (comp.m_chain_front_data_begin != comp.m_chain_back_data_end)
-                {
-                    --comp.m_chain_back_data_end;
-                    data_allocator_traits_t::destroy(this->get_data_allocator(), comp.m_chain_back_data_end);
-                }
                 if (this->is_chain_back_empty())
                 { this->buffer_chain_push_front(this->get_chain_back_pop()); }
             }
