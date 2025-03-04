@@ -1,5 +1,7 @@
 #pragma once
 
+#include <bit>
+
 #include "SIA/internals/types.hpp"
 #include "SIA/utility/tools.hpp"
 #include "SIA/utility/type_container.hpp"
@@ -58,7 +60,7 @@ namespace sia
             {
                 using pos_t = tcon_t::template at_t<Nth>;
                 constexpr pos_t obj { };
-                return reinterpret_cast<pos_t::type*>(this->address(obj.pos()));
+                return std::bit_cast<pos_t::type*>(this->address(obj.pos()));
             }
 
             template <size_t Nth>
@@ -66,7 +68,7 @@ namespace sia
             {
                 using pos_t = tcon_t::template at_t<Nth>;
                 constexpr pos_t obj { };
-                return reinterpret_cast<pos_t::type*>(this->address(obj.pos()));
+                return std::bit_cast<const pos_t::type*>(this->address(obj.pos()));
             }
 
             template <size_t Nth>

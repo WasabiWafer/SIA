@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <bit>
 #include <new>
 
 #include "SIA/internals/types.hpp"
@@ -15,8 +16,8 @@ namespace sia
         {
             chunk<byte_t, Align> m_data;
 
-            constexpr T* get_ptr() noexcept { return reinterpret_cast<T*>(this->m_data.m_bin); }
-            constexpr const T* get_ptr() const noexcept { return reinterpret_cast<const T*>(this->m_data.m_bin); }
+            constexpr T* get_ptr() noexcept { return std::bit_cast<T*>(this->m_data.m_bin); }
+            constexpr const T* get_ptr() const noexcept { return std::bit_cast<const T*>(this->m_data.m_bin); }
             constexpr T& get_ref() noexcept { return *(this->get_ptr()); }
             constexpr const T& get_ref() const noexcept { return *(this->get_ptr()); }
         };

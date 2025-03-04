@@ -45,7 +45,7 @@ namespace sia
         constexpr chain_allocator_t& get_chain_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
         constexpr size_t data_capacity(this auto&& self) noexcept { return Size; }
 
-        constexpr void proc_dealloc(this auto&& self, chain_data_t* ptr) noexcept
+        constexpr void proc_dealloc(this auto&& self, chain_data_t* ptr) noexcept(noexcept(chain_allocator_traits_t::deallocate(self.get_chain_allocator(), ptr, 1)))
         {
             chain_allocator_t& c_alloc = self.get_chain_allocator();
             while (ptr != nullptr)
@@ -86,7 +86,7 @@ namespace sia
             return comp.m_chain_back_data_end == (comp.m_chain_back->m_data + self.data_capacity());
         }
 
-        constexpr chain_data_t* gen_new_chain_data(this auto&& self)
+        constexpr chain_data_t* gen_new_chain_data(this auto&& self) noexcept(noexcept(chain_allocator_traits_t::allocate(self.get_chain_allocator(), 1)))
         {
             chain_data_t* ret = chain_allocator_traits_t::allocate(self.get_chain_allocator(), 1);
             ret->m_prev = nullptr;
@@ -148,7 +148,7 @@ namespace sia
             }
         }
 
-        constexpr void chain_push_back(this auto&& self, chain_data_t* ptr)
+        constexpr void chain_push_back(this auto&& self, chain_data_t* ptr) noexcept(noexcept(self.gen_new_chain_data()))
         {
             composition_t& comp = self.get_composition();
             if (ptr == nullptr)
@@ -159,7 +159,7 @@ namespace sia
             comp.m_chain_back_data_end = ptr->m_data;
         }
 
-        constexpr void chain_push_front(this auto&& self, chain_data_t* ptr)
+        constexpr void chain_push_front(this auto&& self, chain_data_t* ptr) noexcept(noexcept(self.gen_new_chain_data()))
         {
             composition_t& comp = self.get_composition();
             if (ptr == nullptr)
@@ -172,7 +172,7 @@ namespace sia
 
 
     public:
-        constexpr chain(const chain_allocator_t& chain_alloc = Allocator())
+        constexpr chain(const chain_allocator_t& chain_alloc = Allocator()) noexcept(noexcept(chain_allocator_traits_t::allocate(this->get_chain_allocator(), 1)))
             : m_compair(splits::one_v, chain_alloc, nullptr, nullptr, nullptr, nullptr, nullptr)
         {
             composition_t& comp = this->get_composition();
@@ -187,7 +187,7 @@ namespace sia
             comp.m_chain_front_data_begin = comp.m_chain_back->m_data;
         }
 
-        ~chain()
+        ~chain() noexcept(noexcept(T().~T()))
         {
             composition_t& comp = this->get_composition();
             this->proc_dealloc(comp.m_chain_front);

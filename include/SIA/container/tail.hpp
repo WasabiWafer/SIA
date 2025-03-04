@@ -14,7 +14,7 @@ namespace sia
         struct tail_data
         {
             tail_data* m_next;
-            T* m_data;
+            T m_data[1];
         };
 
         template <typename T>
