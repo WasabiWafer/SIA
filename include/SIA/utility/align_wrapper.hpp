@@ -2,7 +2,6 @@
 
 #include <type_traits>
 #include <bit>
-#include <new>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/utility/tools.hpp"
@@ -11,13 +10,14 @@ namespace sia
 {
     namespace align_wrapper_detail
     {
-        template <typename T, size_t Align> requires (alignof(T) <= Align)
+        template <typename T, size_t Align>
+            requires (alignof(T) <= Align)
         struct align_wrapper_impl
         {
             chunk<byte_t, Align> m_data;
 
-            constexpr T* get_ptr() noexcept { return std::bit_cast<T*>(this->m_data.m_bin); }
-            constexpr const T* get_ptr() const noexcept { return std::bit_cast<const T*>(this->m_data.m_bin); }
+            constexpr T* get_ptr() noexcept { return std::bit_cast<T*>(static_cast<byte_t*>(this->m_data.m_bin)); }
+            constexpr const T* get_ptr() const noexcept { return std::bit_cast<const T*>(static_cast<const byte_t*>(this->m_data.m_bin)); }
             constexpr T& get_ref() noexcept { return *(this->get_ptr()); }
             constexpr const T& get_ref() const noexcept { return *(this->get_ptr()); }
         };

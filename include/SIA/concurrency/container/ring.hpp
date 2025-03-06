@@ -4,6 +4,7 @@
 #include <atomic>
 
 #include "SIA/utility/align_wrapper.hpp"
+#include "SIA/concurrency/utility/mutex.hpp"
 
 namespace sia
 {
@@ -18,6 +19,7 @@ namespace sia
                     template <typename T, size_t Size>
                     struct ring_composition
                     {
+                        
                         false_share<std::atomic<T*>> m_data;
                         false_share<std::atomic<size_t>> m_begin;
                         false_share<std::atomic<size_t>> m_end;

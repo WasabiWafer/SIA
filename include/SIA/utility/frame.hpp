@@ -54,6 +54,7 @@ namespace sia
             chunk<byte_t, ByteSize> m_data;
 
             constexpr byte_t* address(size_t pos) noexcept { return m_data.m_bin + pos; }
+            constexpr const byte_t* address(size_t pos) const noexcept { return m_data.m_bin + pos; }
 
             template <size_t Nth>
             constexpr auto ptr() noexcept

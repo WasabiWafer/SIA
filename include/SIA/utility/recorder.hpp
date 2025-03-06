@@ -1,7 +1,7 @@
 #pragma once
 
 #include <type_traits>
-#include <print>
+#include <span>
 #include <chrono>
 
 namespace sia
@@ -27,6 +27,7 @@ namespace sia
         struct time_exp<tags::time_unit::minutes, Rep> { using type = std::chrono::duration<float, std::ratio<60>>; };
         template <typename Rep>
         struct time_exp<tags::time_unit::hours, Rep> { using type = std::chrono::duration<float, std::ratio<3600>>; };
+
         template <tags::time_unit Tag, typename Rep = float>
         using time_exp_t = time_exp<Tag, Rep>::type;
     } // namespace recorder_detail
@@ -42,6 +43,44 @@ namespace sia
         void set() noexcept { m_record[0] = clock_t::now(); }
         void now() noexcept { m_record[1] = clock_t::now(); }
         template <tags::time_unit Tag, typename Rep = float>
-        auto reuslt() noexcept { return recorder_detail::time_exp_t<Tag, Rep>(m_record[1] - m_record[0]); }
+        Rep reuslt() noexcept { return recorder_detail::time_exp_t<Tag, Rep>(m_record[1] - m_record[0]).count(); }
+    };    
+
+    template <typename Rep, size_t LoopNum, auto... Callables>
+    struct constant_runner
+    {
+    private:
+        using seq_t = std::make_index_sequence<sizeof...(Callables)>;
+        using result_t = std::span<Rep, sizeof...(Callables)>;
+
+        single_recorder m_sr;
+        Rep m_result[sizeof...(Callables)];
+
+        constexpr size_t loop_count() noexcept { return LoopNum; }
+        constexpr size_t call_size() noexcept { return sizeof...(Callables); }
+
+        template <tags::time_unit Tag, typename T>
+        constexpr void call_impl(size_t pos, T&& call) noexcept(noexcept(call.operator()()))
+        {
+            this->m_sr.set();
+            for(size_t pos{ }; pos < this->loop_count(); ++pos)
+            { call.operator()(); }
+            this->m_sr.now();
+            this->m_result[pos] = this->m_sr.template reuslt<Tag, Rep>();
+        }
+
+        template <tags::time_unit Tag, size_t... Seqs>
+        constexpr void run_impl(std::index_sequence<Seqs...> seq = seq_t()) noexcept((noexcept(this->call_impl<Tag>(Seqs, Callables)) && ...))
+        { 
+            this->call_impl<Tag>(0, [](){});
+            (this->call_impl<Tag>(Seqs, Callables), ...);
+        }
+
+    public:
+        template <tags::time_unit Tag = tags::time_unit::seconds>
+        constexpr void run() noexcept(noexcept(this->run_impl<Tag>(seq_t())))
+        { this->run_impl<Tag>(seq_t()); }
+
+        result_t result() noexcept { return result_t(static_cast<Rep*>(this->m_result), sizeof...(Callables)); }
     };
 } // namespace sia
