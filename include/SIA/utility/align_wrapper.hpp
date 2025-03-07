@@ -76,7 +76,4 @@ namespace sia
         constexpr const T* operator->() const noexcept
         { return this->m_impl.get_ptr(); }
     };
-
-    template <typename T> using false_share = align_wrapper<T, std::hardware_destructive_interference_size>;
-    template <typename T> using true_share  = align_wrapper<T, std::hardware_constructive_interference_size>;
 } // namespace sia
