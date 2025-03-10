@@ -16,12 +16,13 @@ namespace sia
     {
     private:
         using value_t = ValueType;
-        false_share<std::atomic<value_t>> m_count;
-        false_share<std::atomic<value_t>> m_core;
+        using atomic_t = std::atomic<value_t>;
+        using wrap_t = false_share<atomic_t>;
+        wrap_t m_count;
+        
 
         constexpr value_t count_limit(this auto&& self) noexcept { return Limit;}
         constexpr value_t num_step(this auto&& self) noexcept { return value_t(1); }
-        
         template <tags::wait Tag>
         constexpr void proc_tag() noexcept
         {
@@ -31,40 +32,27 @@ namespace sia
             { std::this_thread::yield(); }
         }
 
-        template <tags::wait Tag>
-        constexpr bool proc_loop_compare(value_t& arg) noexcept
-        {
-            if (Limit == std::numeric_limits<value_t>::max())
-            { return arg == this->count_limit(); }
-            else
-            { return arg >= this->count_limit(); }
-        }
-
     public:
-        constexpr semaphore(largest_unsigned_integer_t init = 0) noexcept
-            : m_count(init), m_core(init)
+        constexpr semaphore(value_t init = Limit) noexcept
+            : m_count(init)
         { assertm(this->m_count->is_always_lock_free, ""); }
 
         template <tags::wait Tag = tags::wait::busy>
         constexpr void acquire() noexcept
         {
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
-            value_t result { };
-            loop_label:
-            while (this->proc_loop_compare<Tag>(result = this->m_count->fetch_add(this->num_step(), mem_order)))
+            bool loop_cond { };
+            value_t num {this->m_count->load(mem_order)};
+            while (!loop_cond)
             {
-                this->m_count->fetch_sub(this->num_step(), mem_order);
-                this->proc_tag<Tag>();
-            }
-            if (this->m_core->load(mem_order) <= result)
-            {
-                while (this->m_core->compare_exchange_weak(result, result + 1, mem_order))
+                if (num != 0)
+                {
+                    loop_cond = this->m_count->compare_exchange_strong(num, num - this->num_step(), mem_order);
+                    if (!loop_cond)
+                    { this->proc_tag<Tag>(); }
+                }
+                else
                 { this->proc_tag<Tag>(); }
-            }
-            else
-            {
-                result = this->m_count->fetch_sub(this->num_step(), mem_order);
-                goto loop_label;
             }
         }
 
@@ -77,17 +65,57 @@ namespace sia
         }
 
         template <tags::wait Tag = tags::wait::busy>
-        constexpr void try_acqure() noexcept
+        constexpr bool try_acquire() noexcept
         {
-            value_t result { };
-            
+            constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
+            bool loop_cond { };
+            value_t num {this->m_count->load(mem_order)};
+            while ((num != 0) && (!loop_cond))
+            {
+                loop_cond = this->m_count->compare_exchange_strong(num, num - this->num_step(), mem_order);
+                if (!loop_cond)
+                { this->proc_tag<Tag>(); }
+            }
+            return loop_cond;
+        }
+
+        template <tags::time_unit Unit = tags::time_unit::seconds, tags::wait Tag = tags::wait::busy>
+        constexpr bool try_acquire(float time) noexcept
+        {
+            constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
+            single_recorder sr{ };
+            bool loop_cond { };
+            value_t num {this->m_count->load(mem_order)};
+
+            if (num != 0)
+            {
+                sr.set();
+                loop_cond = this->m_count->compare_exchange_strong(num, num - this->num_step(), mem_order);
+                sr.now();
+                while ((num != 0) && (!loop_cond) && (sr.reuslt<Unit, float>() < time))
+                {
+                    this->proc_tag<Tag>();
+                    loop_cond = this->m_count->compare_exchange_strong(num, num - this->num_step(), mem_order);
+                    sr.now();
+                }
+            }
+            return loop_cond;
+        }
+
+        template <tags::time_unit Unit = tags::time_unit::seconds>
+        constexpr bool try_acquire(float time, tags::wait tag) noexcept
+        {
+            if (tag == tags::wait::busy)
+            { return this->try_acquire<Unit, tags::wait::busy>(time); }
+            else if (tag == tags::wait::yield)
+            { return this->try_acquire<Unit, tags::wait::yield>(time); }
+            return false;
         }
 
         constexpr void release() noexcept
         {
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
-            this->m_core->fetch_sub(this->num_step(), mem_order);
-            this->m_count->fetch_sub(this->num_step(), mem_order);
+            this->m_count->fetch_add(this->num_step(), mem_order);
         }
     };
 } // namespace sia

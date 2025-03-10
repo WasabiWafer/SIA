@@ -42,8 +42,8 @@ namespace sia
     public:
         void set() noexcept { m_record[0] = clock_t::now(); }
         void now() noexcept { m_record[1] = clock_t::now(); }
-        template <tags::time_unit Tag, typename Rep = float>
-        Rep reuslt() noexcept { return recorder_detail::time_exp_t<Tag, Rep>(m_record[1] - m_record[0]).count(); }
+        template <tags::time_unit Unit, typename Rep = float>
+        Rep reuslt() noexcept { return recorder_detail::time_exp_t<Unit, Rep>(m_record[1] - m_record[0]).count(); }
     };    
 
     template <typename Rep, size_t LoopNum, auto... Callables>
@@ -59,21 +59,22 @@ namespace sia
         constexpr size_t loop_count() noexcept { return LoopNum; }
         constexpr size_t call_size() noexcept { return sizeof...(Callables); }
 
-        template <tags::time_unit Tag, typename T>
+        template <tags::time_unit Unit, typename T>
         constexpr void call_impl(size_t pos, T&& call) noexcept(noexcept(call.operator()()))
         {
             this->m_sr.set();
             for(size_t pos{ }; pos < this->loop_count(); ++pos)
             { call.operator()(); }
             this->m_sr.now();
-            this->m_result[pos] = this->m_sr.template reuslt<Tag, Rep>();
+            this->m_result[pos] = this->m_sr.template reuslt<Unit, Rep>();
         }
 
-        template <tags::time_unit Tag, size_t... Seqs>
-        constexpr void run_impl(std::index_sequence<Seqs...> seq = seq_t()) noexcept((noexcept(this->call_impl<Tag>(Seqs, Callables)) && ...))
+        template <tags::time_unit Unit, size_t... Seqs>
+        constexpr void run_impl(std::index_sequence<Seqs...> seq = seq_t()) noexcept((noexcept(this->call_impl<Unit>(Seqs, Callables)) && ...))
         { 
-            this->call_impl<Tag>(0, [](){});
-            (this->call_impl<Tag>(Seqs, Callables), ...);
+            // this->call_impl<Unit>(0, [](){});
+            (this->call_impl<Unit>(Seqs, Callables), ...);
+            // ((this->call_impl<Unit>(Seqs, [](){}), this->call_impl<Unit>(Seqs, Callables)) , ...); // better ?
         }
 
     public:

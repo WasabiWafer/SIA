@@ -3,9 +3,11 @@
 #include <type_traits>
 #include <cassert>
 #include <memory>
+#include <bit>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/internals/define.hpp"
+#include "SIA/utility/compressed_pair.hpp"
 
 #define assertm(exp, msg) assert((void(msg), exp))
 
@@ -16,6 +18,10 @@ namespace sia
 
     template <auto Data>
     constexpr const auto& make_static() noexcept { return Data; }
+
+    template <typename To, typename From>
+    [[nodiscard]]
+    constexpr To type_cast(const From& arg) noexcept { return std::bit_cast<To>(arg); }
 
     template <typename T, typename... Ts>
     struct is_same_all : public std::bool_constant<(std::is_same_v<T, Ts> && ...)> { };
@@ -44,13 +50,25 @@ namespace sia
     {
         private:
         using allocator_traits_t = std::allocator_traits<Allocator>;
-        Allocator m_alloc;
+        compressed_pair<Allocator, T*> m_compair;
         public:
-        T* m_bin;
-        constexpr chunk(Allocator alloc = Allocator()) : m_alloc(alloc), m_bin(allocator_traits_t::allocate(m_alloc, N)) { allocator_traits_t::construct(m_alloc, m_bin); }
-        ~chunk() { allocator_traits_t::deallocate(m_alloc, m_bin, N); }
+        constexpr chunk(const Allocator& alloc = Allocator()) noexcept(noexcept(Allocator(alloc)) && noexcept(allocator_traits_t::allocate(alloc, N)))
+            : m_compair(splits::one_v, alloc)
+        { m_compair.second() = allocator_traits_t::allocate(m_compair.first(), N);}
+        ~chunk() noexcept(noexcept(allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), N)))
+        { allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), N); }
+
+        constexpr T* ptr() noexcept { return m_compair.second(); }
+        constexpr const T* ptr() const noexcept { return m_compair.second(); }
     };
 
     template <typename T, size_t N>
-    struct chunk<T, N, tags::memory_locations::stack> { T m_bin[N]; };
+    struct chunk<T, N, tags::memory_locations::stack>
+    {
+    private:
+        T m_bin[N];
+    public:
+        constexpr T* ptr() noexcept { return m_bin; }
+        constexpr const T* ptr() const noexcept { return m_bin; }
+    };
 } // namespace sia

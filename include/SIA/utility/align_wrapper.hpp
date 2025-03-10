@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <memory>
 #include <bit>
 
 #include "SIA/internals/types.hpp"
@@ -11,47 +12,47 @@ namespace sia
     namespace align_wrapper_detail
     {
         template <typename T, size_t Align>
-            requires (alignof(T) <= Align)
+            requires (1 <= Align)
         struct align_wrapper_impl
         {
             chunk<byte_t, Align> m_data;
 
-            constexpr T* get_ptr() noexcept { return std::bit_cast<T*>(static_cast<byte_t*>(this->m_data.m_bin)); }
-            constexpr const T* get_ptr() const noexcept { return std::bit_cast<const T*>(static_cast<const byte_t*>(this->m_data.m_bin)); }
+            constexpr T* get_ptr() noexcept { return type_cast<T*>(static_cast<byte_t*>(this->m_data.ptr())); }
+            constexpr const T* get_ptr() const noexcept { return type_cast<const T*>(static_cast<const byte_t*>(this->m_data.ptr())); }
             constexpr T& get_ref() noexcept { return *(this->get_ptr()); }
             constexpr const T& get_ref() const noexcept { return *(this->get_ptr()); }
         };
     } // namespace align_wrapper_detail
     
     template <typename T, size_t Align>
-    struct alignas(Align) align_wrapper
+    struct align_wrapper : private align_wrapper_detail::align_wrapper_impl<T, Align>
     {
     private:
-        using impl_t = align_wrapper_detail::align_wrapper_impl<T, Align>;
-        impl_t m_impl;
+        using base_t = align_wrapper_detail::align_wrapper_impl<T, Align>;
 
     public:
-        constexpr align_wrapper() noexcept(noexcept(T()))
-            : m_impl()
-        { }
+        constexpr align_wrapper() noexcept(noexcept(std::construct_at(this->ptr())))
+            : base_t()
+        { std::construct_at(this->ptr()); }
 
-        constexpr align_wrapper(const align_wrapper& arg) noexcept(noexcept(T(arg.ref())))
-            : m_impl()
-        { new(this->ptr()) T(arg.ref()); }
+        constexpr align_wrapper(const align_wrapper& arg) noexcept(noexcept(std::construct_at(this->ptr(), arg.ref())))
+            : base_t()
+        { std::construct_at(this->ptr(), arg.ref()); }
 
-        constexpr align_wrapper(align_wrapper&& arg) noexcept(noexcept(T(std::move(arg.ref))))
-            : m_impl()
-        { new(this->ptr()) T(std::move(arg.ref())); }
+        constexpr align_wrapper(align_wrapper&& arg) noexcept(noexcept(std::construct_at(this->ptr(), std::move(arg.ref()))))
+            : base_t()
+        { std::construct_at(this->ptr(), std::move(arg.ref())); }
 
         template <typename Ty, typename... Tys>
             requires (!std::is_same_v<std::remove_cvref_t<Ty>, align_wrapper>)
-        constexpr align_wrapper(Ty&& arg, Tys&&... args) noexcept(noexcept(T(Ty(arg), Tys(args)...)))
-            : m_impl()
-        { new(this->ptr()) T(std::forward<Ty>(arg), std::forward<Tys>(args)...); }
+        constexpr align_wrapper(Ty&& arg, Tys&&... args) noexcept(noexcept(std::construct_at(this->ptr(), std::forward<Ty>(arg), std::forward<Tys>(args)...)))
+            : base_t()
+        { std::construct_at(this->ptr(), std::forward<Ty>(arg), std::forward<Tys>(args)...); }
 
-        ~align_wrapper() noexcept(noexcept(T().~T()))  { this->ref().~T(); }
+        ~align_wrapper() noexcept(noexcept(std::destroy_at(this->ptr())))
+        { std::destroy_at(this->ptr()); }
 
-        constexpr align_wrapper& operator=(const align_wrapper& arg) noexcept(noexcept(this->ref() = T(arg.ref())))
+        constexpr align_wrapper& operator=(const align_wrapper& arg) noexcept(noexcept(this->ref() = arg.ref()))
         {
             if (this->ptr() != arg.ptr())
             { this->ref() = arg.ref(); }
@@ -59,21 +60,21 @@ namespace sia
         }
 
         constexpr T& ref() noexcept
-        { return this->m_impl.get_ref(); }
+        { return this->get_ref(); }
 
         constexpr const T& ref() const noexcept
-        { return this->m_impl.get_ref(); }
+        { return this->get_ref(); }
 
         constexpr T* ptr() noexcept
-        { return this->m_impl.get_ptr(); }
+        { return this->get_ptr(); }
 
         constexpr const T* ptr() const noexcept
-        { return this->m_impl.get_ptr(); }
+        { return this->get_ptr(); }
         
         constexpr T* operator->() noexcept
-        { return this->m_impl.get_ptr(); }
+        { return this->get_ptr(); }
 
         constexpr const T* operator->() const noexcept
-        { return this->m_impl.get_ptr(); }
+        { return this->get_ptr(); }
     };
 } // namespace sia

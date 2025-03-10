@@ -36,7 +36,7 @@ namespace sia
         constexpr bool LayoutType_v = LayoutType<T>::value;
 
         template <typename... Ts>
-        consteval size_t calc_layout_max_size() noexcept
+        consteval size_t proc_get_layout_max_size() noexcept
         {
             size_t ret { };
             constexpr auto max = [] (size_t& arg, const size_t in) constexpr noexcept -> void { if(arg < in) { arg = in; } };
@@ -53,15 +53,15 @@ namespace sia
 
             chunk<byte_t, ByteSize> m_data;
 
-            constexpr byte_t* address(size_t pos) noexcept { return m_data.m_bin + pos; }
-            constexpr const byte_t* address(size_t pos) const noexcept { return m_data.m_bin + pos; }
+            constexpr byte_t* address(size_t pos) noexcept { return m_data.ptr() + pos; }
+            constexpr const byte_t* address(size_t pos) const noexcept { return m_data.ptr() + pos; }
 
             template <size_t Nth>
             constexpr auto ptr() noexcept
             {
                 using pos_t = tcon_t::template at_t<Nth>;
                 constexpr pos_t obj { };
-                return std::bit_cast<pos_t::type*>(this->address(obj.pos()));
+                return type_cast<pos_t::type*>(this->address(obj.pos()));
             }
 
             template <size_t Nth>
@@ -69,7 +69,7 @@ namespace sia
             {
                 using pos_t = tcon_t::template at_t<Nth>;
                 constexpr pos_t obj { };
-                return std::bit_cast<const pos_t::type*>(this->address(obj.pos()));
+                return type_cast<const pos_t::type*>(this->address(obj.pos()));
             }
 
             template <size_t Nth>
@@ -115,6 +115,6 @@ namespace sia
 
     template <typename... Ts>
         requires (frame_detail::LayoutType_v<Ts> && ...)
-    struct frame : public frame_detail::frame_impl<frame_detail::calc_layout_max_size<Ts...>(), Ts...>
+    struct frame : public frame_detail::frame_impl<frame_detail::proc_get_layout_max_size<Ts...>(), Ts...>
     { };
 } // namespace sia

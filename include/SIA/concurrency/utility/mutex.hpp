@@ -58,17 +58,18 @@ namespace sia
         bool try_lock(float time) noexcept
         {
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
-            single_recorder st{ };
+            single_recorder sr{ };
             thread_id_t default_thread_id_v { };
             bool ret { };
-            st.set();
+
+            sr.set();
             ret = this->m_owner->compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
-            st.now();
-            while (!ret && (0.f < (time - st.reuslt<Unit>().count())))
+            sr.now();
+            while (!ret && (sr.reuslt<Unit, float>() < time))
             {
                 this->proc_tag<Tag>();
                 ret = this->m_owner->compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
-                st.now();
+                sr.now();
             }
             return ret;
         }
