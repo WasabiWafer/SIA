@@ -3,6 +3,7 @@
 #include <type_traits>
 #include <memory>
 #include <bit>
+#include <cmath>
 
 #include "SIA/internals/types.hpp"
 #include "SIA/utility/tools.hpp"
@@ -12,10 +13,19 @@ namespace sia
     namespace align_wrapper_detail
     {
         template <typename T, size_t Align>
+        consteval size_t get_require_space() noexcept
+        {
+            if (sizeof(T) <= Align)
+            { return Align; }
+            else
+            { return Align * std::ceil(float(sizeof(T)) / float(Align)); }
+        }
+
+        template <typename T, size_t Align>
             requires (1 <= Align)
         struct align_wrapper_impl
         {
-            chunk<byte_t, Align> m_data;
+            chunk<byte_t, get_require_space<T, Align>()> m_data;
 
             constexpr T* get_ptr() noexcept { return type_cast<T*>(static_cast<byte_t*>(this->m_data.ptr())); }
             constexpr const T* get_ptr() const noexcept { return type_cast<const T*>(static_cast<const byte_t*>(this->m_data.ptr())); }

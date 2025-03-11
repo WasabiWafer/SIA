@@ -86,7 +86,6 @@ namespace sia
             single_recorder sr{ };
             bool loop_cond { };
             value_t num {this->m_count->load(mem_order)};
-
             if (num != 0)
             {
                 sr.set();
