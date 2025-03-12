@@ -34,7 +34,7 @@ namespace sia
         };
     } // namespace align_wrapper_detail
     
-    template <typename T, size_t Align>
+    template <typename T, size_t Align = sizeof(T)>
     struct align_wrapper : private align_wrapper_detail::align_wrapper_impl<T, Align>
     {
     private:

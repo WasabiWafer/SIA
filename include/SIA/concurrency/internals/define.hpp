@@ -26,8 +26,7 @@ namespace sia
 
         namespace this_thread
         {
-            thread_local thread_id_t id_v = std::this_thread::get_id()._Get_underlying_id();
+            thread_local const thread_id_t id_v = std::this_thread::get_id()._Get_underlying_id();
         } // namespace thread
-        
     } // namespace tag
 } // namespace sia
