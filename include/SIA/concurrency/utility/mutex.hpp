@@ -13,7 +13,7 @@ namespace sia
     struct mutex
     {
     private:
-        false_share<std::atomic<thread_id_t>> m_owner;
+        std::atomic<thread_id_t> m_owner;
 
         thread_id_t get_thread_id() noexcept
         { return sia::stamps::this_thread::id_v; }
@@ -21,21 +21,21 @@ namespace sia
         template <tags::wait Tag>
         constexpr void proc_tag() noexcept
         {
-            if (Tag == tags::wait::busy)
+            if constexpr (Tag == tags::wait::busy)
             { }
-            else if (Tag == tags::wait::yield)
+            else if constexpr (Tag == tags::wait::yield)
             { std::this_thread::yield(); }
         }
     public:
         constexpr mutex() noexcept : m_owner()
-        { assertm(m_owner->is_always_lock_free, ""); }
+        { assertm(m_owner.is_always_lock_free, ""); }
 
         template <tags::wait Tag = tags::wait::busy>
         void lock() noexcept
         {
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
             thread_id_t default_thread_id_v { };
-            while(!this->m_owner->compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order))
+            while(!this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order))
             { this->proc_tag<Tag>(); }
         }
 
@@ -51,7 +51,7 @@ namespace sia
         {
             constexpr auto mem_order = stamps::memory_orders::relaxed_v;
             thread_id_t default_thread_id_v { };
-            return this->m_owner->compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
+            return this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
         }
 
         template <tags::time_unit Unit = tags::time_unit::seconds, tags::wait Tag = tags::wait::busy>
@@ -63,12 +63,12 @@ namespace sia
             bool ret { };
 
             sr.set();
-            ret = this->m_owner->compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
+            ret = this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
             sr.now();
             while (!ret && (sr.reuslt<Unit, float>() < time))
             {
                 this->proc_tag<Tag>();
-                ret = this->m_owner->compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
+                ret = this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
                 sr.now();
             }
             return ret;
@@ -89,7 +89,7 @@ namespace sia
             constexpr auto mem_order = stamps::memory_orders::relaxed_v;
             thread_id_t default_thread_id_v { };
             thread_id_t this_thread_id_v { this->get_thread_id() };
-            return this->m_owner->compare_exchange_weak(this_thread_id_v, default_thread_id_v, mem_order);
+            return this->m_owner.compare_exchange_weak(this_thread_id_v, default_thread_id_v, mem_order);
         }
     };
 } // namespace sia

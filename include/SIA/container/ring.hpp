@@ -69,7 +69,7 @@ namespace sia
             { ++pos; }
         }
     public:
-        constexpr ring(const allocator_t& alloc = Allocator()) noexcept(noexcept(allocator_traits_t::allocate(this->get_allocator(), Size)))
+        constexpr ring(const allocator_t& alloc = allocator_t()) noexcept(noexcept(allocator_t(alloc)) && noexcept(allocator_traits_t::allocate(this->get_allocator(), Size)))
             : m_compair(splits::one_v, alloc, nullptr, 0, 0)
         {
             composition_t& comp = this->get_composition();

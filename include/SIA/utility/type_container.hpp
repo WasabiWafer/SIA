@@ -20,9 +20,8 @@ namespace sia
 
     namespace type_sequence_detail
     {
-        template <typename... Ts> struct map_overload : public Ts... { using Ts::map...; };
-        template <typename... Ts> map_overload(Ts...) -> map_overload<Ts...>;
-
+        SIA_GEN_OVERLOAD(map_overload, map)
+        
         template <typename... Ts>
         struct type_sequence_impl;
 

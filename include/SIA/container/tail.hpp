@@ -36,18 +36,6 @@ namespace sia
 
         compressed_pair<tail_allocator_t, composition_t> m_compair;
 
-    public:
-        constexpr tail(const tail_allocator_t& alloc = Allocator()) noexcept(noexcept(tail_allocator_t()))
-            : m_compair(splits::one_v, alloc, nullptr, nullptr)
-        { }
-
-        ~tail() noexcept(noexcept(deallocate_proc(m_compair.second().m_data)) && noexcept(T().~T()))
-        {
-            auto& comp = m_compair.second();
-            deallocate_proc(comp.m_data);
-            deallocate_proc(comp.m_buffer);
-        }
-
     private:
         constexpr tail_allocator_t& get_tail_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
         constexpr composition_t& get_composition(this auto&& self) noexcept { return self.m_compair.second(); }
@@ -61,8 +49,18 @@ namespace sia
                 ptr = next;
             }
         }
-
     public:
+        constexpr tail(const tail_allocator_t& alloc = tail_allocator_t()) noexcept(noexcept(tail_allocator_t(alloc)))
+            : m_compair(splits::one_v, alloc, nullptr, nullptr)
+        { }
+
+        ~tail() noexcept(noexcept(deallocate_proc(m_compair.second().m_data)) && noexcept(T().~T()))
+        {
+            auto& comp = m_compair.second();
+            deallocate_proc(comp.m_data);
+            deallocate_proc(comp.m_buffer);
+        }
+
         constexpr bool is_empty(this auto&& self) noexcept
         {
             composition_t& comp = self.get_composition();

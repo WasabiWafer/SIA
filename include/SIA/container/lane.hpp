@@ -34,7 +34,7 @@ namespace sia
         constexpr T* address(this auto&& self, size_t idx) noexcept { return self.get_composition().m_data + idx; }
         
     public:
-        constexpr lane(const allocator_t& alloc = Allocator()) noexcept(noexcept(allocator_traits_t::allocate(this->get_allocator(), this->capacity())))
+        constexpr lane(const allocator_t& alloc = allocator_t()) noexcept(noexcept(allocator_t(alloc)) && noexcept(allocator_traits_t::allocate(this->get_allocator(), this->capacity())))
             : m_compair(splits::one_v, alloc, nullptr, nullptr)
         {
             allocator_t& allocator = this->get_allocator();

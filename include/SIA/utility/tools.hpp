@@ -16,6 +16,10 @@ namespace sia
     template <typename... Ts> struct overload : public Ts... { using Ts::operator()...; };
     template <typename... Ts> overload(Ts...) -> overload<Ts...>;
 
+    #define SIA_GEN_OVERLOAD(STRUCT_NAME, TARGET_FUNC_NAME) \
+    template <typename... Ts> struct STRUCT_NAME : public Ts... { using Ts::TARGET_FUNC_NAME...; };\
+    template <typename... Ts> STRUCT_NAME(Ts...) -> STRUCT_NAME<Ts...>;
+
     template <auto Data>
     constexpr const auto& make_static() noexcept { return Data; }
 

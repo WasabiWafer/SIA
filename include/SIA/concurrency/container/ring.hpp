@@ -7,6 +7,7 @@
 #include "SIA/utility/compressed_pair.hpp"
 #include "SIA/concurrency/utility/mutex.hpp"
 #include "SIA/concurrency/utility/semaphore.hpp"
+#include "SIA/concurrency/utility/quota.hpp"
 
 namespace sia
 {
@@ -19,10 +20,10 @@ namespace sia
                 template <typename T>
                 struct ring_composition
                 {
-                    false_share<std::atomic<T*>> m_data;
-                    false_share<semaphore<1>> m_sep_begin;
+                    T* m_data;
+                    false_share<semaphore<size_t, 1>> m_sep_begin;
                     false_share<std::atomic<size_t>> m_begin;
-                    false_share<semaphore<1>> m_sep_end;
+                    false_share<semaphore<size_t, 1>> m_sep_end;
                     false_share<std::atomic<size_t>> m_end;
                 };
             } // namespace ring_detail
@@ -40,12 +41,12 @@ namespace sia
                 constexpr allocator_t&  get_alloc() noexcept { return this->m_compair.first(); }
                 
             public:
-                constexpr ring(const allocator_t& alloc) noexcept(noexcept(allocator_traits_t::allocate(this->get_alloc(), Size)))
+                constexpr ring(const allocator_t& alloc = allocator_t()) noexcept(noexcept(allocator_t(alloc)) && noexcept(allocator_traits_t::allocate(this->get_alloc(), Size)))
                     : m_compair(splits::one_v, alloc)
                 { this->get_comp().m_data = allocator_traits_t::allocate(this->get_alloc(), Size); }
 
-                ~ring() noexcept(noexcept(allocator_t::deallocate(this->get_alloc(), this->get_comp().m_data, this->capacity())))
-                { allocator_t::deallocate(this->get_alloc(), this->get_comp().m_data, this->capacity()); }
+                ~ring() noexcept(noexcept(allocator_traits_t::deallocate(this->get_alloc(), this->get_comp().m_data.load(stamps::memory_orders::relaxed_v), this->capacity())))
+                { allocator_traits_t::deallocate(this->get_alloc(), this->get_comp().m_data, this->capacity()); }
 
                 constexpr size_t capacity(this auto&& self) noexcept { return Size; }
                 constexpr size_t size(this auto&& self) noexcept
@@ -58,8 +59,13 @@ namespace sia
                 template <typename... Tys>
                 constexpr bool try_emplace_back(Tys&&... args) noexcept
                 {
-                    composition_t& comp = self.get_comp();
-                    bool cond {comp.m_sep_begin->try_acquire()}; // need lock/acq
+                    composition_t& comp = this->get_comp();
+                    semaphore<size_t, 1>& sep = comp.m_sep_end->ref();
+                    bool cond {sep.try_acquire()};
+                    if (cond)
+                    {
+                        quota r {sep, tags::quota::have};
+                    }
                     return cond;
                 }
             };

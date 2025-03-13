@@ -17,8 +17,7 @@ namespace sia
     private:
         using value_t = ValueType;
         using atomic_t = std::atomic<value_t>;
-        using wrap_t = false_share<atomic_t>;
-        wrap_t m_count;
+        atomic_t m_count;
         
 
         constexpr value_t count_limit(this auto&& self) noexcept { return Limit;}
@@ -26,28 +25,28 @@ namespace sia
         template <tags::wait Tag>
         constexpr void proc_tag() noexcept
         {
-            if (Tag == tags::wait::busy)
+            if constexpr (Tag == tags::wait::busy)
             { }
-            else if (Tag == tags::wait::yield)
+            else if constexpr (Tag == tags::wait::yield)
             { std::this_thread::yield(); }
         }
 
     public:
         constexpr semaphore(value_t init = Limit) noexcept
             : m_count(init)
-        { assertm(this->m_count->is_always_lock_free, ""); }
+        { assertm(this->m_count.is_always_lock_free, ""); }
 
         template <tags::wait Tag = tags::wait::busy>
         constexpr void acquire() noexcept
         {
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
             bool loop_cond { };
-            value_t num {this->m_count->load(mem_order)};
+            value_t num {this->m_count.load(mem_order)};
             while (!loop_cond)
             {
                 if (num != 0)
                 {
-                    loop_cond = this->m_count->compare_exchange_strong(num, num - this->num_step(), mem_order);
+                    loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
                     if (!loop_cond)
                     { this->proc_tag<Tag>(); }
                 }
@@ -69,10 +68,10 @@ namespace sia
         {
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
             bool loop_cond { };
-            value_t num {this->m_count->load(mem_order)};
+            value_t num {this->m_count.load(mem_order)};
             while ((num != 0) && (!loop_cond))
             {
-                loop_cond = this->m_count->compare_exchange_strong(num, num - this->num_step(), mem_order);
+                loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
                 if (!loop_cond)
                 { this->proc_tag<Tag>(); }
             }
@@ -85,16 +84,16 @@ namespace sia
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
             single_recorder sr{ };
             bool loop_cond { };
-            value_t num {this->m_count->load(mem_order)};
+            value_t num {this->m_count.load(mem_order)};
             if (num != 0)
             {
                 sr.set();
-                loop_cond = this->m_count->compare_exchange_strong(num, num - this->num_step(), mem_order);
+                loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
                 sr.now();
                 while ((num != 0) && (!loop_cond) && (sr.reuslt<Unit, float>() < time))
                 {
                     this->proc_tag<Tag>();
-                    loop_cond = this->m_count->compare_exchange_strong(num, num - this->num_step(), mem_order);
+                    loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
                     sr.now();
                 }
             }
@@ -114,7 +113,7 @@ namespace sia
         constexpr void release() noexcept
         {
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
-            this->m_count->fetch_add(this->num_step(), mem_order);
+            this->m_count.fetch_add(this->num_step(), mem_order);
         }
     };
 } // namespace sia

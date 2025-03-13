@@ -207,7 +207,7 @@ namespace sia
 
 
     public:
-        constexpr chain(const chain_allocator_t& chain_alloc = Allocator()) noexcept(noexcept(chain_allocator_traits_t::allocate(this->get_chain_allocator(), 1)) && noexcept(chain_allocator_t()))
+        constexpr chain(const chain_allocator_t& chain_alloc = chain_allocator_t()) noexcept(noexcept(chain_allocator_traits_t::allocate(this->get_chain_allocator(), 1)) && noexcept(chain_allocator_t(chain_alloc)))
             : m_compair(splits::one_v, chain_alloc, nullptr, nullptr, nullptr, nullptr, nullptr)
         {
             composition_t& comp = this->get_composition();
