@@ -38,22 +38,22 @@ namespace sia
         { }
     }
 
-    template <auto OutCond, tags::wait Tag = tags::wait::busy, typename Func, typename... Ts>
+    template <auto LoopOutCond, tags::wait Tag = tags::wait::busy, typename Func, typename... Ts>
         requires (std::is_invocable_v<Func, Ts...>)
     constexpr bool loop(Func&& func, Ts&&... args) noexcept(noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
     {
-        while(OutCond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
+        while(LoopOutCond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
         { wait<Tag>(); }
         return true;
     }
 
-    template <auto OutCond, tags::wait Tag = tags::wait::busy, tags::time_unit Unit = tags::time_unit::seconds, typename Rep = float, typename Func, typename... Ts>
+    template <auto LoopOutCond, tags::wait Tag = tags::wait::busy, tags::time_unit Unit = tags::time_unit::seconds, typename Rep = float, typename Func, typename... Ts>
         requires (std::is_invocable_v<Func, Ts...>)
     constexpr bool loop(Rep time, Func&& func, Ts&&... args) noexcept(noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
     {
         single_recorder sr { };
         sr.set();
-        bool cond = (OutCond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...));
+        bool cond = (LoopOutCond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...));
         sr.now();
         while(cond && (sr.reuslt<Unit, Rep>() < time))
         {
