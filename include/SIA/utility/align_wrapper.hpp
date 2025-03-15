@@ -76,7 +76,7 @@ namespace sia
             return *this;
         }
 
-        constexpr align_wrapper& operator=(T& arg) noexcept(noexcept(this->ref() = std::move(arg)))
+        constexpr align_wrapper& operator=(T&& arg) noexcept(noexcept(this->ref() = std::move(arg)))
         {
             if (this->ptr() != &arg)
             { this->ref() = std::move(arg); }

@@ -83,6 +83,7 @@ namespace sia
                 { this->m_target.release(); }
                 else
                 { }
+                this->m_own = false;
             }
         }
 
@@ -125,6 +126,24 @@ namespace sia
 
         constexpr bool is_own() noexcept
         { return this->m_own; }
+
+        constexpr bool take() noexcept(quota_detail::is_in_nothrow<T>())
+        {
+            this->proc_init_tag();
+            return this->is_own();
+        }
+
+        constexpr bool take(tags::quota tag) noexcept(quota_detail::is_in_nothrow<T>())
+        {
+            this->proc_init_tag(tag);
+            return this->is_own();
+        }
+
+        constexpr bool back() noexcept(quota_detail::is_out_nothrow<T>())
+        {
+            this->out();
+            return !this->is_own();
+        }
     };
 
     template <tags::quota Tag = tags::quota::take, typename T = void>

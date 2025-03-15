@@ -38,27 +38,27 @@ namespace sia
         { }
     }
 
-    template <bool OutCond, tags::wait Tag = tags::wait::busy, typename Func = void, typename... Ts>
-        requires (std::is_invocable_r_v<bool, Func, Ts...>)
-    constexpr bool loop(Func&& func, Ts&&... args) noexcept(noexcept(std::invoke_r<bool>(std::forward<Func>(func), std::forward<Ts>(args)...)))
+    template <auto OutCond, tags::wait Tag = tags::wait::busy, typename Func, typename... Ts>
+        requires (std::is_invocable_v<Func, Ts...>)
+    constexpr bool loop(Func&& func, Ts&&... args) noexcept(noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
     {
-        while(OutCond != std::invoke_r<bool>(std::forward<Func>(func), std::forward<Ts>(args)...))
+        while(OutCond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
         { wait<Tag>(); }
         return true;
     }
 
-    template <bool OutCond, tags::wait Tag = tags::wait::busy, tags::time_unit Unit = tags::time_unit::seconds, typename Rep = float, typename Func = void, typename... Ts>
-        requires (std::is_invocable_r_v<bool, Func, Ts...>)
-    constexpr bool loop(Rep time, Func&& func, Ts&&... args) noexcept(noexcept(std::invoke_r<bool>(std::forward<Func>(func), std::forward<Ts>(args)...)))
+    template <auto OutCond, tags::wait Tag = tags::wait::busy, tags::time_unit Unit = tags::time_unit::seconds, typename Rep = float, typename Func, typename... Ts>
+        requires (std::is_invocable_v<Func, Ts...>)
+    constexpr bool loop(Rep time, Func&& func, Ts&&... args) noexcept(noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
     {
         single_recorder sr { };
         sr.set();
-        auto cond = std::invoke_r<bool>(std::forward<Func>(func), std::forward<Ts>(args)...);
+        bool cond = (OutCond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...));
         sr.now();
-        while((OutCond != cond) && (sr.reuslt<Unit, Rep>() < time))
+        while(cond && (sr.reuslt<Unit, Rep>() < time))
         {
             wait<Tag>();
-            cond = std::invoke_r<bool>(std::forward<Func>(func), std::forward<Ts>(args)...);
+            cond = std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...);
             sr.now();
         }
         return cond;
