@@ -26,7 +26,7 @@ namespace sia
 {
     namespace tags
     {
-        enum class numbers { zero, one, two, three, four, five, six, seven, eight, nine};
+        enum class numbers { zero, one, two, three, four, five, six, seven, eight, nine };
         enum class lower_letters { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z };
         enum class upper_letters { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z };
         enum class memory_locations { stack, heap };
@@ -89,9 +89,9 @@ namespace sia
     {
         namespace system
         {
-            constexpr auto os_v = stamps_detail::get_os();
-            constexpr auto os_bit_v = stamps_detail::get_os_bit();
-            constexpr auto arch_v = stamps_detail::get_architecture();
+            constexpr const auto os_v = stamps_detail::get_os();
+            constexpr const auto os_bit_v = stamps_detail::get_os_bit();
+            constexpr const auto arch_v = stamps_detail::get_architecture();
         } // namespace system        
     } // namespace stamps
 } // namespace sia

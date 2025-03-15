@@ -6,6 +6,7 @@
 #include "SIA/concurrency/internals/types.hpp"
 #include "SIA/concurrency/internals/define.hpp"
 #include "SIA/utility/tools.hpp"
+#include "SIA/concurrency/utility/tools.hpp"
 #include "SIA/utility/recorder.hpp"
 
 namespace sia
@@ -18,14 +19,6 @@ namespace sia
         thread_id_t get_thread_id() noexcept
         { return sia::stamps::this_thread::id_v; }
 
-        template <tags::wait Tag>
-        constexpr void proc_tag() noexcept
-        {
-            if constexpr (Tag == tags::wait::busy)
-            { }
-            else if constexpr (Tag == tags::wait::yield)
-            { std::this_thread::yield(); }
-        }
     public:
         constexpr mutex() noexcept : m_owner()
         { assertm(m_owner.is_always_lock_free, ""); }
@@ -36,7 +29,7 @@ namespace sia
             constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
             thread_id_t default_thread_id_v { };
             while(!this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order))
-            { this->proc_tag<Tag>(); }
+            { wait<Tag>(); }
         }
 
         void lock(const tags::wait& tag) noexcept
@@ -67,7 +60,7 @@ namespace sia
             sr.now();
             while (!ret && (sr.reuslt<Unit, float>() < time))
             {
-                this->proc_tag<Tag>();
+                wait<Tag>();
                 ret = this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
                 sr.now();
             }

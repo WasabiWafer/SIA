@@ -16,12 +16,12 @@ namespace sia
     {
         namespace memory_orders
         {
-            constexpr auto seq_cst_v = std::memory_order_seq_cst;
-            constexpr auto relaxed_v = std::memory_order_relaxed;
-            constexpr auto acquire_v = std::memory_order_acquire;
-            constexpr auto consume_v = std::memory_order_consume;
-            constexpr auto release_v = std::memory_order_release;
-            constexpr auto acq_rel_v = std::memory_order_acq_rel;
+            constexpr const auto seq_cst_v = std::memory_order_seq_cst;
+            constexpr const auto relaxed_v = std::memory_order_relaxed;
+            constexpr const auto acquire_v = std::memory_order_acquire;
+            constexpr const auto consume_v = std::memory_order_consume;
+            constexpr const auto release_v = std::memory_order_release;
+            constexpr const auto acq_rel_v = std::memory_order_acq_rel;
         } // namespace memory_order
 
         namespace this_thread

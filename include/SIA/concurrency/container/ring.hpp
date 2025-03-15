@@ -1,7 +1,8 @@
 #pragma once
-
+#include <print>
 #include <memory>
 #include <atomic>
+#include <optional>
 
 #include "SIA/utility/align_wrapper.hpp"
 #include "SIA/utility/compressed_pair.hpp"
@@ -20,10 +21,10 @@ namespace sia
                 template <typename T>
                 struct ring_composition
                 {
-                    T* m_data;
-                    false_share<semaphore<size_t, 1>> m_sep_begin;
+                    false_share<std::optional<T>*> m_data;
+                    false_share<mutex> m_mu_pro;
+                    false_share<mutex> m_mu_con;
                     false_share<std::atomic<size_t>> m_begin;
-                    false_share<semaphore<size_t, 1>> m_sep_end;
                     false_share<std::atomic<size_t>> m_end;
                 };
             } // namespace ring_detail
@@ -32,21 +33,31 @@ namespace sia
             struct ring
             {
             private:
-                using allocator_t = Allocator;
-                using allocator_traits_t = std::allocator_traits<Allocator>;
+                using value_t = std::optional<T>;
+                using allocator_t = std::allocator_traits<Allocator>::template rebind_alloc<value_t>;
+                using allocator_traits_t = std::allocator_traits<allocator_t>;
                 using composition_t = ring_detail::ring_composition<T>;
                 compressed_pair<allocator_t, composition_t> m_compair;
 
                 constexpr composition_t& get_comp() noexcept { return this->m_compair.second(); }
-                constexpr allocator_t&  get_alloc() noexcept { return this->m_compair.first(); }
+                constexpr allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
+                constexpr value_t* get_data() noexcept { return this->m_compair.second().m_data.ref(); }
+                constexpr value_t* raw_address(size_t pos) noexcept { return this->get_data() + (pos % this->capacity());}
                 
             public:
                 constexpr ring(const allocator_t& alloc = allocator_t()) noexcept(noexcept(allocator_t(alloc)) && noexcept(allocator_traits_t::allocate(this->get_alloc(), Size)))
                     : m_compair(splits::one_v, alloc)
-                { this->get_comp().m_data = allocator_traits_t::allocate(this->get_alloc(), Size); }
+                {
+                    constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
+                    composition_t& comp = this->get_comp();
+                    allocator_t& allocator = this->get_alloc();
+                    comp.m_data.ref() = allocator_traits_t::allocate(allocator, Size);
+                    for (size_t n { }; n < Size; ++n)
+                    { allocator_traits_t::construct(allocator, comp.m_data.ref() + n); }
+                }
 
-                ~ring() noexcept(noexcept(allocator_traits_t::deallocate(this->get_alloc(), this->get_comp().m_data.load(stamps::memory_orders::relaxed_v), this->capacity())))
-                { allocator_traits_t::deallocate(this->get_alloc(), this->get_comp().m_data, this->capacity()); }
+                ~ring() noexcept(noexcept(allocator_traits_t::deallocate(this->get_alloc(), this->get_data(), this->capacity())))
+                { allocator_traits_t::deallocate(this->get_alloc(), this->get_data(), this->capacity()); }
 
                 constexpr size_t capacity(this auto&& self) noexcept { return Size; }
                 constexpr size_t size(this auto&& self) noexcept
@@ -55,18 +66,70 @@ namespace sia
                     composition_t& comp = self.get_comp();
                     return comp.m_end->load(mem_order) - comp.m_begin->load(mem_order);
                 }
+                constexpr bool is_empty(this auto&& self) noexcept
+                { return self.size() == 0; }
+                constexpr bool is_full(this auto&& self) noexcept
+                { return self.size() == self.capacity(); }
+
+                constexpr bool try_pop_back() noexcept
+                {
+                    constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
+                    composition_t& comp = this->get_comp();
+                    if (!this->is_empty())
+                    {
+                        quota q {comp.m_mu_con.ref(), tags::quota::try_take};
+                        if (q.is_own())
+                        {
+                            value_t* target_ptr = this->raw_address(comp.m_end->fetch_sub(1, mem_order) - 1);
+                            loop<true>(&value_t::has_value, target_ptr);
+                            allocator_traits_t::destroy(this->get_alloc(), target_ptr);
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                constexpr void pop_back() noexcept
+                { loop<true>(&ring::try_pop_back, this); }
 
                 template <typename... Tys>
-                constexpr bool try_emplace_back(Tys&&... args) noexcept
+                constexpr bool try_emplace_back(Tys&&... args) noexcept(noexcept(T(std::forward<Tys>(args)...)))
                 {
+                    constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
                     composition_t& comp = this->get_comp();
-                    semaphore<size_t, 1>& sep = comp.m_sep_end->ref();
-                    bool cond {sep.try_acquire()};
-                    if (cond)
+                    if (!this->is_full())
                     {
-                        quota r {sep, tags::quota::have};
+                        quota q {comp.m_mu_pro.ref(), tags::quota::try_take};
+                        if (q.is_own())
+                        {
+                            value_t* target_ptr = this->raw_address(comp.m_end->fetch_add(1, mem_order));
+                            loop<false>(&value_t::has_value, target_ptr);
+                            allocator_traits_t::construct(this->get_alloc(), target_ptr, std::forward<Tys>(args)...);
+                            return true;
+                        }
                     }
-                    return cond;
+                    return false;
+                }
+                template <typename Ty>
+                constexpr bool try_push_back(const Ty& arg) noexcept(noexcept(this->try_emplace_back(arg)))
+                { return this->try_emplace_back(arg); }
+                template <typename Ty>
+                constexpr bool try_push_back(Ty&& arg) noexcept(noexcept(this->try_emplace_back(std::move(arg))))
+                { return this->try_emplace_back(std::move(arg)); }
+
+                constexpr T back() noexcept
+                {
+                    constexpr auto mem_order = stamps::memory_orders::acquire_v;
+                    composition_t& comp = this->get_comp();
+                    quota q {comp.m_mu_con.ref()};
+                    return this->raw_address(comp.m_end->load(mem_order) - 1)->value();
+                }
+                constexpr const T back() const noexcept
+                {
+                    constexpr auto mem_order = stamps::memory_orders::acquire_v;
+                    composition_t& comp = this->get_comp();
+                    quota q {comp.m_mu_con.ref()};
+                    return this->raw_address(comp.m_end->load(mem_order) - 1)->value();
                 }
             };
         } // namespace spsc

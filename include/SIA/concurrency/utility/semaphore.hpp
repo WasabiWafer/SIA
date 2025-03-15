@@ -7,6 +7,7 @@
 #include "SIA/concurrency/internals/types.hpp"
 #include "SIA/concurrency/internals/define.hpp"
 #include "SIA/utility/tools.hpp"
+#include "SIA/concurrency/utility/tools.hpp"
 #include "SIA/utility/recorder.hpp"
 
 namespace sia
@@ -22,15 +23,6 @@ namespace sia
 
         constexpr value_t count_limit(this auto&& self) noexcept { return Limit;}
         constexpr value_t num_step(this auto&& self) noexcept { return value_t(1); }
-        template <tags::wait Tag>
-        constexpr void proc_tag() noexcept
-        {
-            if constexpr (Tag == tags::wait::busy)
-            { }
-            else if constexpr (Tag == tags::wait::yield)
-            { std::this_thread::yield(); }
-        }
-
     public:
         constexpr semaphore(value_t init = Limit) noexcept
             : m_count(init)
@@ -48,10 +40,13 @@ namespace sia
                 {
                     loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
                     if (!loop_cond)
-                    { this->proc_tag<Tag>(); }
+                    { wait<Tag>(); }
                 }
                 else
-                { this->proc_tag<Tag>(); }
+                {
+                    num = this->m_count.load(mem_order);
+                    wait<Tag>();
+                }
             }
         }
 
@@ -73,7 +68,7 @@ namespace sia
             {
                 loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
                 if (!loop_cond)
-                { this->proc_tag<Tag>(); }
+                { wait<Tag>(); }
             }
             return loop_cond;
         }
@@ -92,7 +87,7 @@ namespace sia
                 sr.now();
                 while ((num != 0) && (!loop_cond) && (sr.reuslt<Unit, float>() < time))
                 {
-                    this->proc_tag<Tag>();
+                    wait<Tag>();
                     loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
                     sr.now();
                 }
@@ -112,7 +107,7 @@ namespace sia
 
         constexpr void release() noexcept
         {
-            constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
+            constexpr auto mem_order = stamps::memory_orders::relaxed_v;
             this->m_count.fetch_add(this->num_step(), mem_order);
         }
     };

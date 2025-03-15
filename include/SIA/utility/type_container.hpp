@@ -20,7 +20,7 @@ namespace sia
 
     namespace type_sequence_detail
     {
-        SIA_GEN_OVERLOAD(map_overload, map)
+        SIA_MACRO_GEN_OVERLOAD(map_overload, map)
         
         template <typename... Ts>
         struct type_sequence_impl;
