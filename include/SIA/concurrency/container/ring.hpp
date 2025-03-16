@@ -21,7 +21,7 @@ namespace sia
                 template <typename T>
                 struct ring_composition
                 {
-                    false_share<std::optional<T>*> m_data;
+                    false_share<T*> m_data;
                     false_share<mutex> m_mu_pro;
                     false_share<mutex> m_mu_con;
                     false_share<std::atomic<size_t>> m_begin;
@@ -33,7 +33,7 @@ namespace sia
             struct ring
             {
             private:
-                using value_t = std::optional<T>;
+                using value_t = T;
                 using allocator_t = std::allocator_traits<Allocator>::template rebind_alloc<value_t>;
                 using allocator_traits_t = std::allocator_traits<allocator_t>;
                 using composition_t = ring_detail::ring_composition<T>;
@@ -83,8 +83,8 @@ namespace sia
                         if (!this->is_empty())
                         {
                             value_t* target_ptr = this->raw_address(comp.m_end->load(acq) - 1);
-                            out = std::move(target_ptr->value());
-                            target_ptr->reset();
+                            out = std::move(*target_ptr);
+                            allocator_traits_t::destroy(this->get_alloc(), target_ptr);
                             comp.m_end->fetch_sub(1, rle);
                             return true;
                         }
@@ -104,7 +104,7 @@ namespace sia
                         if (!this->is_full())
                         {
                             value_t* target_ptr = this->raw_address(comp.m_end->load(acq));
-                            target_ptr->emplace(std::forward<Tys>(args)...);
+                            allocator_traits_t::construct(this->get_alloc(), target_ptr, std::forward<Tys>(args)...);
                             comp.m_end->fetch_add(1, rle);
                             return true;
                         }
@@ -143,8 +143,8 @@ namespace sia
                         if (!this->is_empty())
                         {
                             value_t* target_ptr = this->raw_address(comp.m_begin->load(acq));
-                            out = target_ptr->value();
-                            target_ptr->reset();
+                            out = std::move(*target_ptr);
+                            allocator_traits_t::destroy(this->get_alloc(), target_ptr);
                             comp.m_begin->fetch_add(1, rle);
                             return true;
                         }
@@ -164,7 +164,7 @@ namespace sia
                         if (!this->is_full())
                         {
                             value_t* target_ptr = this->raw_address(comp.m_begin->load(acq) - 1);
-                            target_ptr->emplace(std::forward<Tys>(args)...);
+                            allocator_traits_t::construct(this->get_alloc(), target_ptr, std::forward<Tys>(args)...);
                             comp.m_begin->fetch_sub(1, rle);
                             return true;
                         }
@@ -196,7 +196,7 @@ namespace sia
 
         namespace mpmc
         {
-            
+
         } // namespace mpmc
     } // namespace concurrency
 } // namespace sia
