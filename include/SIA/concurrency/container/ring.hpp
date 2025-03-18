@@ -21,11 +21,11 @@ namespace sia
                 template <typename T>
                 struct ring_composition
                 {
-                    false_share<T*> m_data;
                     false_share<mutex> m_mu_pro;
                     false_share<mutex> m_mu_con;
                     false_share<std::atomic<size_t>> m_begin;
                     false_share<std::atomic<size_t>> m_end;
+                    T* m_data;
                 };
             } // namespace ring_detail
             
@@ -42,7 +42,7 @@ namespace sia
 
                 constexpr composition_t& get_comp() noexcept { return this->m_compair.second(); }
                 constexpr allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
-                constexpr value_t* get_data() noexcept { return this->m_compair.second().m_data.ref(); }
+                constexpr value_t* get_data() noexcept { return this->m_compair.second().m_data; }
                 constexpr value_t* raw_address(size_t pos) noexcept { return this->get_data() + (pos % this->capacity());}
                 
             public:
@@ -52,9 +52,7 @@ namespace sia
                     constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
                     composition_t& comp = this->get_comp();
                     allocator_t& allocator = this->get_alloc();
-                    comp.m_data.ref() = allocator_traits_t::allocate(allocator, Size);
-                    for (size_t n { }; n < Size; ++n)
-                    { allocator_traits_t::construct(allocator, comp.m_data.ref() + n); }
+                    comp.m_data = allocator_traits_t::allocate(allocator, Size);
                 }
 
                 ~ring() noexcept(noexcept(allocator_traits_t::deallocate(this->get_alloc(), this->get_data(), this->capacity())))
@@ -196,7 +194,65 @@ namespace sia
 
         namespace mpmc
         {
+            namespace ring_detail
+            {
+                template <typename T, size_t Size>
+                struct ring_data
+                {
+                    false_share<std::atomic<T*>> m_ptr[Size];
+                    T m_arr[Size];
+                };
 
+                template <typename T, size_t Size>
+                struct ring_composition
+                {
+                    false_share<std::atomic<size_t>> m_begin;
+                    false_share<std::atomic<size_t>> m_end;
+                    ring_data<T, Size>* m_data;
+                };
+            } // namespace ring_detail
+            
+            template <typename T, size_t Size, typename Allocator = std::allocator<T>>
+            struct ring
+            {
+            private:
+                using value_t = ring_data<T, Size>;
+                using composition_t = ring_detail::ring_composition<T>;
+                using allocator_t = std::allocator_traits<Allocator>::template rebind_alloc<value_t>;
+                using allocator_trailts_t = std::allocator_traits<allocator_t>;
+                compressed_pair<allocator_t, composition_t> m_compair;
+            public:
+                constexpr ring(const allocator_t& alloc = Allocator()) noexcept
+                    : m_compair(splits::one_v, alloc)
+                {
+                    
+                }
+
+                ~ring() noexcept
+                {
+
+                }
+
+                constexpr composition_t& get_comp() noexcept { return this->m_compair.second(); }
+                constexpr allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
+                constexpr value_t* get_data() noexcept { return this->get_comp().m_data.ref(); }
+                constexpr size_t capacity() noexcept {return Size; }
+                constexpr size_t size() noexcept
+                {
+                    constexpr auto mem_order = stamps::memory_orders::relaxed_v;
+                    composition_t& comp = this->get_comp();
+                    return comp.m_end->load(mem_order) - comp.m_begin->load(mem_order);
+                }
+                constexpr bool is_full() noexcept
+                { return this->size() == this->capacity(); }
+                constexpr bool is_empty() noexcept
+                { return this->size() == 0; }
+                
+                constexpr bool try_pop_back() noexcept
+                {
+                    
+                }
+            };
         } // namespace mpmc
     } // namespace concurrency
 } // namespace sia
