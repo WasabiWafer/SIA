@@ -20,7 +20,6 @@ namespace sia
         using atomic_t = std::atomic<value_t>;
         atomic_t m_count;
         
-
         constexpr value_t count_limit(this auto&& self) noexcept { return Limit;}
         constexpr value_t num_step(this auto&& self) noexcept { return value_t(1); }
     public:

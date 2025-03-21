@@ -44,15 +44,14 @@ namespace sia
                 constexpr allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
                 constexpr value_t* get_data() noexcept { return this->m_compair.second().m_data; }
                 constexpr value_t* raw_address(size_t pos) noexcept { return this->get_data() + (pos % this->capacity());}
-                constexpr size_t get_inc_pos(size_t& pos) noexcept
+                constexpr size_t get_inc_pos(const size_t& pos) noexcept
                 {
-                    composition_t& comp = self.get_comp();
                     if (pos == std::numeric_limits<size_t>::max())
                     { return std::numeric_limits<size_t>::max() % this->capacity() + 1; }
                     else
                     { return pos + 1; }
                 }
-                constexpr size_t get_dec_pos(size_t& pos) noexcept
+                constexpr size_t get_dec_pos(const size_t& pos) noexcept
                 {
                     if (pos == 0)
                     { return std::numeric_limits<size_t>::max() - (std::numeric_limits<size_t>::max() % this->capacity()) - 1; }
@@ -96,11 +95,10 @@ namespace sia
                         if (!this->is_empty())
                         {
                             size_t target_pos = comp.m_end->load(acq);
-                            size_t next_pos = this->get_dec_pos(target_pos);
                             value_t* target_ptr = this->raw_address(target_pos - 1);
                             out = std::move(*target_ptr);
                             allocator_traits_t::destroy(this->get_alloc(), target_ptr);
-                            comp.m_end->fetch_sub(target_pos - next_pos, rle);
+                            comp.m_end->fetch_sub(target_pos - this->get_dec_pos(target_pos), rle);
                             return true;
                         }
                     }
@@ -119,10 +117,9 @@ namespace sia
                         if (!this->is_full())
                         {
                             size_t target_pos = comp.m_end->load(acq);
-                            size_t next_pos = this->get_inc_pos(target_pos);
                             value_t* target_ptr = this->raw_address(target_pos);
                             allocator_traits_t::construct(this->get_alloc(), target_ptr, std::forward<Tys>(args)...);
-                            comp.m_end->fetch_add(next_pos - target_pos, rle);
+                            comp.m_end->fetch_add(this->get_inc_pos(target_pos) - target_pos, rle);
                             return true;
                         }
                     }
@@ -160,11 +157,10 @@ namespace sia
                         if (!this->is_empty())
                         {
                             size_t target_pos = comp.m_begin->load(acq);
-                            size_t next_pos = this->get_inc_pos(target_pos);
                             value_t* target_ptr = this->raw_address(target_pos);
                             out = std::move(*target_ptr);
                             allocator_traits_t::destroy(this->get_alloc(), target_ptr);
-                            comp.m_begin->fetch_add(next_pos - target_pos, rle);
+                            comp.m_begin->fetch_add(this->get_inc_pos(target_pos) - target_pos, rle);
                             return true;
                         }
                     }
@@ -183,10 +179,9 @@ namespace sia
                         if (!this->is_full())
                         {
                             size_t target_pos = comp.m_begin->load(acq);
-                            size_t next_pos = this->get_dec_pos(target_pos);
                             value_t* target_ptr = this->raw_address(comp.m_begin->load(acq) - 1);
                             allocator_traits_t::construct(this->get_alloc(), target_ptr, std::forward<Tys>(args)...);
-                            comp.m_begin->fetch_sub(target_pos - next_pos, rle);
+                            comp.m_begin->fetch_sub(target_pos - this->get_dec_pos(target_pos), rle);
                             return true;
                         }
                     }
@@ -248,7 +243,27 @@ namespace sia
                 using composition_t = ring_detail::ring_composition<T, Size>;
                 using data_allocator_t = std::allocator_traits<Allocator>::template rebind_alloc<data_t>;
                 using data_allocator_trailts_t = std::allocator_traits<data_allocator_t>;
+
                 compressed_pair<data_allocator_t, composition_t> m_compair;
+
+                constexpr composition_t& get_comp() noexcept { return this->m_compair.second(); }
+                constexpr data_allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
+                constexpr elem_t& get_elem(size_t pos) noexcept { return *(this->get_comp().m_ptr->m_arr + (pos % this->capacity())); }
+                constexpr size_t get_inc_pos(const size_t& pos) noexcept
+                {
+                    if (pos == std::numeric_limits<size_t>::max())
+                    { return std::numeric_limits<size_t>::max() % this->capacity() + 1; }
+                    else
+                    { return pos + 1; }
+                }
+                constexpr size_t get_dec_pos(const size_t& pos) noexcept
+                {
+                    if (pos == 0)
+                    { return std::numeric_limits<size_t>::max() - (std::numeric_limits<size_t>::max() % this->capacity()) - 1; }
+                    else
+                    { return pos - 1; }
+                }
+
             public:
                 constexpr ring(const data_allocator_t& alloc = Allocator()) noexcept
                     : m_compair(splits::one_v, alloc)
@@ -263,10 +278,6 @@ namespace sia
                 {
 
                 }
-
-                constexpr composition_t& get_comp() noexcept { return this->m_compair.second(); }
-                constexpr data_allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
-                constexpr elem_t& get_elem(size_t pos) noexcept { return *(this->get_comp().m_ptr->m_arr + (pos % this->capacity())); }
                 
                 constexpr size_t capacity() noexcept {return Size; }
                 constexpr size_t size() noexcept
@@ -295,28 +306,15 @@ namespace sia
                     constexpr auto last_state = tags::object_state::constructed;
                     composition_t& comp = this->get_comp();
                     bool loop_cond { };
-                    size_t target_pos {comp.m_end->load()};
+                    size_t target_pos = comp.m_end->load();
                     while (!loop_cond)
                     {
                         if (!this->is_full())
-                        {
-                            loop_cond = comp.m_end->compare_exchange_strong(target_pos, );
-                        }
+                        { loop_cond = comp.m_end->compare_exchange_strong(target_pos, this->get_inc_pos(target_pos)); }
                         else
                         { return false; }
                     }
-
-                    while (!loop_cond)
-                    {
-                        if (!this->is_full())
-                        {
-                            target_pos = comp.m_end->load();
-                            elem_t& data = this->get_data(target_pos);
-                            loop_cond = data.m_state->compare_exchange_weak(target_state, next_state);
-                        }
-                        else
-                        { return false; }
-                    }
+                    
                     
                     return false;
                 }
