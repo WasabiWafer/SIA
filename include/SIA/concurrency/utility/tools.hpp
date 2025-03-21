@@ -38,27 +38,27 @@ namespace sia
         { }
     }
 
-    template <auto LoopOutCond, tags::wait Tag = tags::wait::busy, typename Func, typename... Ts>
+    template <tags::wait Tag = tags::wait::busy, typename T, typename Func, typename... Ts>
         requires (std::is_invocable_v<Func, Ts...>)
-    constexpr bool loop(Func&& func, Ts&&... args) noexcept(noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
+    constexpr bool loop(T&& loop_out_cond, Func&& func, Ts&&... args) noexcept(noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
     {
-        while(LoopOutCond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
+        while(loop_out_cond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
         { wait<Tag>(); }
         return true;
     }
 
-    template <auto LoopOutCond, tags::wait Tag = tags::wait::busy, tags::time_unit Unit = tags::time_unit::seconds, typename Rep = float, typename Func, typename... Ts>
+    template <auto LoopOutCond, tags::wait Tag = tags::wait::busy, tags::time_unit Unit = tags::time_unit::seconds, typename Rep = float, typename T, typename Func, typename... Ts>
         requires (std::is_invocable_v<Func, Ts...>)
-    constexpr bool loop(Rep time, Func&& func, Ts&&... args) noexcept(noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
+    constexpr bool loop(T&& loop_out_cond, Rep time, Func&& func, Ts&&... args) noexcept(noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
     {
         single_recorder sr { };
         sr.set();
-        bool cond = (LoopOutCond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...));
+        bool cond = (loop_out_cond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...));
         sr.now();
         while(cond && (sr.reuslt<Unit, Rep>() < time))
         {
             wait<Tag>();
-            cond = std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...);
+            cond = (loop_out_cond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...));
             sr.now();
         }
         return cond;

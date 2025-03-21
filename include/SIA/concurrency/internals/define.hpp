@@ -2,6 +2,7 @@
 
 #include <atomic>
 
+#include "SIA/utility/tools.hpp"
 #include "SIA/concurrency/internals/types.hpp"
 
 namespace sia
@@ -26,7 +27,7 @@ namespace sia
 
         namespace this_thread
         {
-            thread_local const thread_id_t id_v = std::this_thread::get_id()._Get_underlying_id();
+            thread_local const thread_id_t id_v = type_cast<thread_id_t>(std::this_thread::get_id());
         } // namespace thread
     } // namespace tag
 } // namespace sia

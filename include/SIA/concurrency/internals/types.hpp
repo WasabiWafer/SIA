@@ -6,7 +6,8 @@
 
 namespace sia
 {
-    using thread_id_t = decltype(std::declval<std::thread::id>()._Get_underlying_id());
+    static_assert(std::is_trivially_copyable_v<std::thread::id> && std::is_standard_layout_v<std::thread::id>);
+    using thread_id_t = unsigned_integer_t<sizeof(std::thread::id)>;
 
     template <typename T>
     using false_share = align_wrapper<T, std::hardware_destructive_interference_size>;

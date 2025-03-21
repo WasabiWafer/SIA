@@ -30,6 +30,8 @@ namespace sia
         enum class lower_letters { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z };
         enum class upper_letters { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z };
         enum class memory_locations { stack, heap };
+        enum class life_cycle { allocated, constructed, destructed, deallocated };
+        enum class object_state { occupy, allocating, allocated, constructing, constructed, destructing, destructed, vacate };
         enum class os { windows, linux, other };
         enum class arch { x32, x64, other };
     } // namespace tag

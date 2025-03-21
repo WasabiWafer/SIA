@@ -117,18 +117,18 @@ namespace sia
 
                 template <tags::wait LoopTag = tags::wait::busy>
                 constexpr void pop_back(T& out) noexcept(noexcept(this->try_pop_back(out)))
-                { loop<true, LoopTag>(&ring::try_pop_back, this, out); }
+                { loop<LoopTag>(true, &ring::try_pop_back, this, out); }
 
                 template <tags::wait LoopTag = tags::wait::busy>
                 constexpr void push_back(const T& arg) noexcept(noexcept(this->try_push_back(arg)))
-                { loop<true, LoopTag>(static_cast<bool(ring::*)(const T&)>(&ring::try_push_back), this, arg); }
+                { loop<LoopTag>(true, static_cast<bool(ring::*)(const T&)>(&ring::try_push_back), this, arg); }
                 template <tags::wait LoopTag = tags::wait::busy>
                 constexpr void push_back(T&& arg) noexcept(noexcept(this->try_push_back(std::move(arg))))
-                { loop<true, LoopTag>(static_cast<bool(ring::*)(T&&)>(&ring::try_push_back), this, std::move(arg)); }
+                { loop<LoopTag>(true, static_cast<bool(ring::*)(T&&)>(&ring::try_push_back), this, std::move(arg)); }
 
                 template <tags::wait LoopTag = tags::wait::busy, typename... Tys>
                 constexpr void emplace_back(Tys&&... args) noexcept(noexcept(this->try_emplace_back(std::forward<Tys>(args)...)))
-                { loop<true, LoopTag>(&ring::try_emplace_back<Tys...>, this, std::forward<Tys>(args)...); }
+                { loop<LoopTag>(true, &ring::try_emplace_back<Tys...>, this, std::forward<Tys>(args)...); }
                 
                 constexpr bool try_pop_front(T& out) noexcept(noexcept(out = T()) && noexcept(value_t().~value_t()))
                 {
@@ -177,18 +177,18 @@ namespace sia
                 
                 template <tags::wait LoopTag = tags::wait::busy>
                 constexpr void pop_front(T& out) noexcept(noexcept(this->try_pop_front(out)))
-                { loop<true, LoopTag>(&ring::try_pop_front, this, out); }
+                { loop<LoopTag>(true, &ring::try_pop_front, this, out); }
 
                 template <tags::wait LoopTag = tags::wait::busy>
                 constexpr void push_front(const T& arg) noexcept(noexcept(this->try_push_front(arg)))
-                { loop<true, LoopTag>(static_cast<bool(ring::*)(const T&)>(&ring::try_push_front), this, arg); }
+                { loop<LoopTag>(true, static_cast<bool(ring::*)(const T&)>(&ring::try_push_front), this, arg); }
                 template <tags::wait LoopTag = tags::wait::busy>
                 constexpr void push_front(T&& arg) noexcept(noexcept(this->try_push_front(std::move(arg))))
-                { loop<true, LoopTag>(static_cast<bool(ring::*)(T&&)>(&ring::try_push_front), this, std::move(arg)); }
+                { loop<LoopTag>(true, static_cast<bool(ring::*)(T&&)>(&ring::try_push_front), this, std::move(arg)); }
 
                 template <tags::wait LoopTag = tags::wait::busy, typename... Tys>
                 constexpr void emplace_front(Tys&&... args) noexcept(noexcept(this->try_emplace_front(std::forward<Tys>(args)...)))
-                { loop<true, LoopTag>(&ring::try_emplace_front<Tys...>, this, std::forward<Tys>(args)...); }
+                { loop<LoopTag>(true, &ring::try_emplace_front<Tys...>, this, std::forward<Tys>(args)...); }
             };
         } // namespace spsc
 
@@ -196,12 +196,16 @@ namespace sia
         {
             namespace ring_detail
             {
+                template <typename T>
+                struct ring_elem
+                {
+                    false_share<std::atomic<tags::object_state>> m_state;
+                    false_share<T> m_elem;
+                };
+                
                 template <typename T, size_t Size>
                 struct ring_data
-                {
-                    false_share<std::atomic<T*>> m_ptr[Size];
-                    T m_arr[Size];
-                };
+                { ring_elem<T> m_data[Size]; };
 
                 template <typename T, size_t Size>
                 struct ring_composition
@@ -216,13 +220,15 @@ namespace sia
             struct ring
             {
             private:
-                using value_t = ring_data<T, Size>;
-                using composition_t = ring_detail::ring_composition<T>;
-                using allocator_t = std::allocator_traits<Allocator>::template rebind_alloc<value_t>;
-                using allocator_trailts_t = std::allocator_traits<allocator_t>;
-                compressed_pair<allocator_t, composition_t> m_compair;
+                using ptr_t = false_share<std::atomic<T*>>;
+                using value_t = std::optional<T>;
+                using data_t = T; //
+                using composition_t = ring_detail::ring_composition<T, Size>;
+                using data_allocator_t = std::allocator_traits<Allocator>::template rebind_alloc<data_t>;
+                using data_allocator_trailts_t = std::allocator_traits<data_allocator_t>;
+                compressed_pair<data_allocator_t, composition_t> m_compair;
             public:
-                constexpr ring(const allocator_t& alloc = Allocator()) noexcept
+                constexpr ring(const data_allocator_t& alloc = Allocator()) noexcept
                     : m_compair(splits::one_v, alloc)
                 {
                     
@@ -234,8 +240,9 @@ namespace sia
                 }
 
                 constexpr composition_t& get_comp() noexcept { return this->m_compair.second(); }
-                constexpr allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
-                constexpr value_t* get_data() noexcept { return this->get_comp().m_data.ref(); }
+                constexpr data_allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
+                constexpr ptr_t* get_ptr(size_t pos) noexcept { return this->get_comp().m_data->m_ptr + (pos % this->capacity()); }
+                constexpr value_t* get_value_ptr(size_t pos) noexcept { return static_cast<value_t*>(this->get_comp().m_data->m_arr) + (pos % this->capacity()); }
                 constexpr size_t capacity() noexcept {return Size; }
                 constexpr size_t size() noexcept
                 {
@@ -248,7 +255,7 @@ namespace sia
                 constexpr bool is_empty() noexcept
                 { return this->size() == 0; }
                 
-                constexpr bool try_pop_back() noexcept
+                constexpr bool try_pop_back(T& out) noexcept
                 {
                     
                 }
