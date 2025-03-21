@@ -19,9 +19,7 @@ namespace sia
         private:
             using base_t = chunk<T, N>;
         public:
-            constexpr constant_string_impl() noexcept : base_t() { }
-            template <size_t... Idxs>
-            constexpr constant_string_impl(const constant_string_impl& arg, std::index_sequence<Idxs...>) noexcept : base_t{arg.m_bin[Idxs]...} { }
+            constexpr constant_string_impl() noexcept = default;
             template <size_t... Idxs>
             constexpr constant_string_impl(const T (&arg)[N], std::index_sequence<Idxs...>) noexcept : base_t{arg[Idxs]...} { }
         };
@@ -33,19 +31,8 @@ namespace sia
     private:
         using base_t = constant_string_detail::constant_string_impl<T, N>;
     public:
-        constexpr constant_string() noexcept : base_t() { }
-        constexpr constant_string(const constant_string& arg) noexcept : base_t(static_cast<base_t>(arg), std::make_index_sequence<N>()) { }
+        constexpr constant_string() noexcept = default;
         constexpr constant_string(const T (&arg)[N]) noexcept : base_t(arg, std::make_index_sequence<N>()) { }
-        constexpr constant_string& operator=(this auto&& self, const constant_string& arg) noexcept
-        {
-            for (T* x = self.m_bin, *y = arg.m_bin; x < (self.m_bin + N); ++x, ++y) { *x = *y; }
-            return self;
-        }
-        constexpr constant_string& operator=(this auto&& self, const T (&arg)[N]) noexcept
-        {
-            for (struct {T* x; const T* y;} obj = {self.m_bin, arg}; obj.x < (self.m_bin + N); ++obj.x, ++obj.y) { *obj.x = *obj.y; }
-            return self;
-        }
 
         constexpr       T* begin()  noexcept        { return this->m_bin; }
         constexpr const T* begin()  const noexcept  { return this->m_bin; }

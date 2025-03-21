@@ -69,10 +69,10 @@ namespace sia
     template <typename T, size_t N>
     struct chunk<T, N, tags::memory_locations::stack>
     {
-    private:
         T m_bin[N];
-    public:
-        constexpr T* ptr() noexcept { return m_bin; }
-        constexpr const T* ptr() const noexcept { return m_bin; }
+        constexpr T* ptr() noexcept { return static_cast<T*>(m_bin); }
+        constexpr const T* ptr() const noexcept { return static_cast<const T*>(m_bin); }
+        constexpr T& operator[](const size_t& pos) noexcept { return this->m_bin[pos]; }
+        constexpr const T& operator[](const size_t& pos) const noexcept { return this->m_bin[pos]; }
     };
 } // namespace sia
