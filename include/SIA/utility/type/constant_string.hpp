@@ -33,13 +33,13 @@ namespace sia
     public:
         constexpr constant_string() noexcept = default;
         constexpr constant_string(const T (&arg)[N]) noexcept : base_t(arg, std::make_index_sequence<N>()) { }
-
-        constexpr       T* begin()  noexcept        { return this->m_bin; }
-        constexpr const T* begin()  const noexcept  { return this->m_bin; }
-        constexpr       T* end()    noexcept        { return this->m_bin + N; }
-        constexpr const T* end()    const noexcept  { return this->m_bin + N; }
-        constexpr std::string_view to_string_view(this auto&& self) noexcept { return std::string_view(self.begin(), N); }
-        constexpr std::string to_string(this auto&& self) noexcept { return std::string(self.begin(), N); }
+        constexpr size_t length(this auto&& self) noexcept { return N; }
+        constexpr       T* begin()  noexcept        { return this->ptr(); }
+        constexpr const T* begin()  const noexcept  { return this->ptr(); }
+        constexpr       T* end()    noexcept        { return this->begin() + this->length(); }
+        constexpr const T* end()    const noexcept  { return this->begin() + this->length(); }
+        constexpr std::string_view to_string_view(this auto&& self) noexcept { return std::string_view(self.begin(), self.length()); }
+        constexpr std::string to_string(this auto&& self) noexcept { return std::string(self.begin(), self.length()); }
     };
 
     template <constant_string_detail::CStrReq T>

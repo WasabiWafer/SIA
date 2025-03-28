@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdfloat>
+
 namespace sia
 {
     using size_t = decltype(sizeof(void*));

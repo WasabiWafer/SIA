@@ -69,9 +69,12 @@ namespace sia
     template <typename T, size_t N>
     struct chunk<T, N, tags::memory_locations::stack>
     {
+        // no private member for Aggregate initialization.
         T m_bin[N];
-        constexpr T* ptr() noexcept { return static_cast<T*>(m_bin); }
-        constexpr const T* ptr() const noexcept { return static_cast<const T*>(m_bin); }
+        constexpr T* ptr(size_t pos = 0) noexcept { return static_cast<T*>(m_bin) + pos; }
+        constexpr const T* ptr(size_t pos = 0) const noexcept { return static_cast<const T*>(m_bin) + pos; }
+        constexpr T& ref(size_t pos = 0) noexcept { return this->m_bin[pos]; }
+        constexpr const T& ref(size_t pos = 0) const noexcept { return this->m_bin[pos]; }
         constexpr T& operator[](const size_t& pos) noexcept { return this->m_bin[pos]; }
         constexpr const T& operator[](const size_t& pos) const noexcept { return this->m_bin[pos]; }
     };

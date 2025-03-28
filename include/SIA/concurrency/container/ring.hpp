@@ -307,13 +307,14 @@ namespace sia
                     composition_t& comp = this->get_comp();
                     bool loop_cond { };
                     size_t target_pos = comp.m_end->load();
-                    while (!loop_cond)
+                    do
                     {
                         if (!this->is_full())
                         { loop_cond = comp.m_end->compare_exchange_strong(target_pos, this->get_inc_pos(target_pos)); }
                         else
                         { return false; }
                     }
+                    while (!loop_cond);
                     
                     
                     return false;
