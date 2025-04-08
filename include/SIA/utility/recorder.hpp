@@ -16,7 +16,7 @@ namespace sia
     
     namespace recorder_detail
     {
-        template <tags::time_unit Tag, typename Rep = float>
+        template <tags::time_unit Tag, typename Rep = long long>
         struct time_exp;
         template <typename Rep>
         struct time_exp<tags::time_unit::nanoseconds, Rep> { using type = std::chrono::duration<Rep, std::nano>; };
@@ -30,10 +30,10 @@ namespace sia
         struct time_exp<tags::time_unit::minutes, Rep> { using type = std::chrono::duration<Rep, std::ratio<60>>; };
         template <typename Rep>
         struct time_exp<tags::time_unit::hours, Rep> { using type = std::chrono::duration<Rep, std::ratio<3600>>; };
-
-        template <tags::time_unit Tag, typename Rep = float>
-        using time_exp_t = time_exp<Tag, Rep>::type;
     } // namespace recorder_detail
+
+    template <tags::time_unit Unit, typename Rep = long long>
+    using time_exp_t = recorder_detail::time_exp<Unit, Rep>::type;
     
     template <size_t LoopNum, auto... Callables>
     struct constant_runner;
@@ -50,9 +50,10 @@ namespace sia
     public:
         void set() noexcept { m_record[0] = clock_t::now(); }
         void now() noexcept { m_record[1] = clock_t::now(); }
-        template <tags::time_unit Unit, typename Rep = float>
-        Rep reuslt() noexcept { return recorder_detail::time_exp_t<Unit, Rep>(m_record[1] - m_record[0]).count(); }
-        std::span<tp_t, 2> result_span() noexcept { return m_record; }
+        template <tags::time_unit Unit, typename Rep = long long>
+        Rep result() noexcept { return std::chrono::duration_cast<time_exp_t<Unit, Rep>>(m_record[1] - m_record[0]).count(); }
+        auto result() noexcept { return m_record[1] - m_record[0]; }
+        std::span<tp_t, 2> get_span() noexcept { return m_record; }
     };    
 
     template <size_t LoopNum, auto... Callables>
@@ -77,7 +78,7 @@ namespace sia
             for(size_t pos{ }; pos < this->loop_count(); ++pos)
             { call.operator()(); }
             this->m_sr.now();
-            auto r_span = this->m_sr.result_span();
+            auto r_span = this->m_sr.get_span();
             this->m_record[pos] = {r_span[0], r_span[1]};
         }
 
@@ -89,7 +90,7 @@ namespace sia
         constexpr Rep get_nth_result(size_t pos) noexcept
         {
             std::pair<tp_t, tp_t>& target = this->m_record[pos];
-            return recorder_detail::time_exp_t<Tag, Rep>(target.second - target.first);
+            return time_exp_t<Tag, Rep>(target.second - target.first);
         }
 
         template <tags::time_unit Tag, typename Rep, size_t... Seqs>

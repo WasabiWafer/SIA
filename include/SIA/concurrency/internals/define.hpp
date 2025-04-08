@@ -10,7 +10,8 @@ namespace sia
     
     namespace tags
     {
-        enum class wait { busy, yield };
+        enum class wait { busy, yield, sleep_for, sleep_until };
+        enum class loop { busy, repeat_n, repeat_for, repeat_until };
     } // namespace tags
     
     namespace stamps

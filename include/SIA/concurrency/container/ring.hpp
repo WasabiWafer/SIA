@@ -44,14 +44,14 @@ namespace sia
                 constexpr allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
                 constexpr value_t* get_data() noexcept { return this->m_compair.second().m_data; }
                 constexpr value_t* raw_address(size_t pos) noexcept { return this->get_data() + (pos % this->capacity());}
-                constexpr size_t get_inc_pos(const size_t& pos) noexcept
+                constexpr size_t get_inc_pos(size_t pos) noexcept
                 {
                     if (pos == std::numeric_limits<size_t>::max())
                     { return std::numeric_limits<size_t>::max() % this->capacity() + 1; }
                     else
                     { return pos + 1; }
                 }
-                constexpr size_t get_dec_pos(const size_t& pos) noexcept
+                constexpr size_t get_dec_pos(size_t pos) noexcept
                 {
                     if (pos == 0)
                     { return std::numeric_limits<size_t>::max() - (std::numeric_limits<size_t>::max() % this->capacity()) - 1; }
@@ -238,6 +238,7 @@ namespace sia
             struct ring
             {
             private:
+                using state_t = std::atomic<tags::object_state>;
                 using elem_t = ring_detail::ring_elem<T>;
                 using data_t = ring_detail::ring_data<T, Size>;
                 using composition_t = ring_detail::ring_composition<T, Size>;
@@ -249,14 +250,14 @@ namespace sia
                 constexpr composition_t& get_comp() noexcept { return this->m_compair.second(); }
                 constexpr data_allocator_t& get_alloc() noexcept { return this->m_compair.first(); }
                 constexpr elem_t& get_elem(size_t pos) noexcept { return *(this->get_comp().m_ptr->m_arr + (pos % this->capacity())); }
-                constexpr size_t get_inc_pos(const size_t& pos) noexcept
+                constexpr size_t get_inc_pos(size_t pos) noexcept
                 {
                     if (pos == std::numeric_limits<size_t>::max())
                     { return std::numeric_limits<size_t>::max() % this->capacity() + 1; }
                     else
                     { return pos + 1; }
                 }
-                constexpr size_t get_dec_pos(const size_t& pos) noexcept
+                constexpr size_t get_dec_pos(size_t pos) noexcept
                 {
                     if (pos == 0)
                     { return std::numeric_limits<size_t>::max() - (std::numeric_limits<size_t>::max() % this->capacity()) - 1; }
@@ -271,7 +272,7 @@ namespace sia
                     composition_t& comp = this->get_comp();
                     comp.m_ptr = data_allocator_trailts_t::allocate(this->get_alloc(), this->capacity());
                     for (size_t pos { }; pos < this->capacity(); ++pos)
-                    { this->get_elem(pos).m_state->store(tags::object_state::allocated); }
+                    { this->get_elem(pos).m_state->store(tags::object_state::destructed); }
                 }
 
                 ~ring() noexcept
@@ -296,27 +297,32 @@ namespace sia
                     return false;
                 }
 
-                constexpr bool try_emplace_back() noexcept
+                template <typename... Tys>
+                constexpr bool try_emplace_back(Tys&&... args) noexcept
                 {
                     constexpr auto acq = stamps::memory_orders::acquire_v;
                     constexpr auto rle = stamps::memory_orders::release_v;
                     constexpr auto rlx = stamps::memory_orders::relaxed_v;
-                    constexpr auto target_state = tags::object_state::allocated;
+                    constexpr auto acq_rle = stamps::memory_orders::acq_rel_v;
+                    constexpr auto target_state = tags::object_state::destructed;
                     constexpr auto next_state = tags::object_state::constructing;
-                    constexpr auto last_state = tags::object_state::constructed;
+                    constexpr auto complete_state = tags::object_state::constructed;
                     composition_t& comp = this->get_comp();
                     bool loop_cond { };
-                    size_t target_pos = comp.m_end->load();
+                    size_t target_pos = comp.m_end->load(rlx);
                     do
                     {
                         if (!this->is_full())
-                        { loop_cond = comp.m_end->compare_exchange_strong(target_pos, this->get_inc_pos(target_pos)); }
+                        { loop_cond = comp.m_end->compare_exchange_strong(target_pos, this->get_inc_pos(target_pos), acq_rle); }
                         else
                         { return false; }
                     }
                     while (!loop_cond);
                     
+                    elem_t& target_elem = this->get_elem(target_pos);
+                    // while (target_elem.m_state->compare_exchange_weak(target_state, next_state, rlx,))
                     
+
                     return false;
                 }
             };

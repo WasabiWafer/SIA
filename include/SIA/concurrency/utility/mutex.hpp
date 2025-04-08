@@ -58,7 +58,7 @@ namespace sia
             sr.set();
             ret = this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);
             sr.now();
-            while (!ret && (sr.reuslt<Unit, float>() < time))
+            while (!ret && (sr.result<Unit, float>() < time))
             {
                 wait<Tag>();
                 ret = this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), mem_order);

@@ -103,7 +103,7 @@ namespace sia
         };
     } // namespace frame_detail
 
-    template <size_t BytePos, typename Type, constant_string Name>
+    template <size_t BytePos, typename Type, constant_string Name = "">
     struct layout
     {
         using type = Type;
@@ -112,7 +112,7 @@ namespace sia
         constexpr size_t type_size(this auto&& self) noexcept { return sizeof(type); }
         constexpr size_t req_size(this auto&& self) noexcept { return self.pos() + self.type_size(); }
     };
-    template <size_t Pos, typename Type, constant_string Name>
+    template <size_t Pos, typename Type, constant_string Name = "">
     using layout_t = layout<Pos, Type, Name>;
 
     template <typename... Ts>

@@ -18,96 +18,63 @@ namespace sia
     private:
         using value_t = ValueType;
         using atomic_t = std::atomic<value_t>;
+
         atomic_t m_count;
-        
-        constexpr value_t count_limit(this auto&& self) noexcept { return Limit;}
+
         constexpr value_t num_step(this auto&& self) noexcept { return value_t(1); }
     public:
         constexpr semaphore(value_t init = Limit) noexcept
             : m_count(init)
         { assertm(this->m_count.is_always_lock_free, ""); }
 
-        template <tags::wait Tag = tags::wait::busy>
-        constexpr void acquire() noexcept
-        {
-            constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
-            bool loop_cond { };
-            value_t num {this->m_count.load(mem_order)};
-            while (!loop_cond)
-            {
-                if (num != 0)
-                {
-                    loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
-                    if (!loop_cond)
-                    { wait<Tag>(); }
-                }
-                else
-                {
-                    num = this->m_count.load(mem_order);
-                    wait<Tag>();
-                }
-            }
-        }
-
-        constexpr void acquire(const tags::wait& tag) noexcept
-        {
-            if (tag == tags::wait::busy)
-            { this->acquire<tags::wait::busy>(); }
-            else if (tag == tags::wait::yield)
-            { this->acquire<tags::wait::yield>(); }
-        }
-
-        template <tags::wait Tag = tags::wait::busy>
         constexpr bool try_acquire() noexcept
         {
-            constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
-            bool loop_cond { };
-            value_t num {this->m_count.load(mem_order)};
-            while ((num != 0) && (!loop_cond))
+            constexpr auto acq = stamps::memory_orders::acquire_v;
+            constexpr auto rle = stamps::memory_orders::release_v;
+            value_t cur = this->m_count.load(acq);
+            if (cur != 0)
             {
-                loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
-                if (!loop_cond)
-                { wait<Tag>(); }
+                while (!this->m_count.compare_exchange_weak(cur, cur - this->num_step(), rle, acq))
+                {
+                    if (cur == 0)
+                    { return false; }
+                }
+                return true;
             }
-            return loop_cond;
+            else
+            { return false; }
         }
 
-        template <tags::time_unit Unit = tags::time_unit::seconds, tags::wait Tag = tags::wait::busy>
-        constexpr bool try_acquire(float time) noexcept
+        template <tags::wait Tag = tags::wait::busy, tags::time_unit Unit = tags::time_unit::seconds, typename Rep0 = float, typename Rep1 = float>
+        constexpr bool try_acquire(Rep0 try_time, Rep1 wait_time = Rep1()) noexcept
         {
-            constexpr auto mem_order = stamps::memory_orders::acq_rel_v;
             single_recorder sr{ };
-            bool loop_cond { };
-            value_t num {this->m_count.load(mem_order)};
-            if (num != 0)
+            sr.set();
+            do
             {
-                sr.set();
-                loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
-                sr.now();
-                while ((num != 0) && (!loop_cond) && (sr.reuslt<Unit, float>() < time))
+                if (this->try_acquire())
+                { return true; }
+                else
                 {
-                    wait<Tag>();
-                    loop_cond = this->m_count.compare_exchange_strong(num, num - this->num_step(), mem_order);
+                    wait<Tag>(wait_time);
                     sr.now();
                 }
             }
-            return loop_cond;
+            while(sr.result<Unit, Rep0>() < try_time);
+            return false;
         }
 
-        template <tags::time_unit Unit = tags::time_unit::seconds>
-        constexpr bool try_acquire(float time, tags::wait tag) noexcept
+        template <tags::wait Tag = tags::wait::busy, typename Rep = float>
+        constexpr void acquire(Rep wait_time = Rep()) noexcept
         {
-            if (tag == tags::wait::busy)
-            { return this->try_acquire<Unit, tags::wait::busy>(time); }
-            else if (tag == tags::wait::yield)
-            { return this->try_acquire<Unit, tags::wait::yield>(time); }
-            return false;
+            while(!this->try_acquire())
+            { wait<Tag>(wait_time); }
         }
 
         constexpr void release() noexcept
         {
-            constexpr auto mem_order = stamps::memory_orders::relaxed_v;
-            this->m_count.fetch_add(this->num_step(), mem_order);
+            constexpr auto rlx = stamps::memory_orders::relaxed_v;
+            this->m_count.fetch_add(this->num_step(), rlx);
         }
     };
 } // namespace sia
