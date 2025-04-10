@@ -9,6 +9,8 @@
 
 namespace sia
 {
+    using default_rep_t = long long;
+
     namespace tags
     {
         enum class time_unit { nanoseconds, microseconds, milliseconds, seconds, minutes, hours};
@@ -16,7 +18,7 @@ namespace sia
     
     namespace recorder_detail
     {
-        template <tags::time_unit Tag, typename Rep = long long>
+        template <tags::time_unit Tag, typename Rep = default_rep_t>
         struct time_exp;
         template <typename Rep>
         struct time_exp<tags::time_unit::nanoseconds, Rep> { using type = std::chrono::duration<Rep, std::nano>; };
@@ -32,25 +34,26 @@ namespace sia
         struct time_exp<tags::time_unit::hours, Rep> { using type = std::chrono::duration<Rep, std::ratio<3600>>; };
     } // namespace recorder_detail
 
-    template <tags::time_unit Unit, typename Rep = long long>
+    template <tags::time_unit Unit, typename Rep = default_rep_t>
     using time_exp_t = recorder_detail::time_exp<Unit, Rep>::type;
     
     template <size_t LoopNum, auto... Callables>
     struct constant_runner;
 
+    template <typename Clock = std::chrono::high_resolution_clock>
     struct single_recorder
     {
     private:
         template <size_t N, auto... Es>
         friend class constant_runner;
-        using clock_t = std::chrono::high_resolution_clock;
-        using tp_t = std::chrono::high_resolution_clock::time_point;
+        using clock_t = Clock;
+        using tp_t = decltype(clock_t::now());
         tp_t m_record[2];
     
     public:
         void set() noexcept { m_record[0] = clock_t::now(); }
         void now() noexcept { m_record[1] = clock_t::now(); }
-        template <tags::time_unit Unit, typename Rep = long long>
+        template <tags::time_unit Unit, typename Rep = default_rep_t>
         Rep result() noexcept { return std::chrono::duration_cast<time_exp_t<Unit, Rep>>(m_record[1] - m_record[0]).count(); }
         auto result() noexcept { return m_record[1] - m_record[0]; }
         std::span<tp_t, 2> get_span() noexcept { return m_record; }
@@ -60,12 +63,12 @@ namespace sia
     struct constant_runner
     {
     private:
-        using tp_t = single_recorder::tp_t;
+        using tp_t = single_recorder<>::tp_t;
         using seq_t = std::make_index_sequence<sizeof...(Callables)>;
         template <typename Rep>
         using result_t = std::array<Rep, sizeof...(Callables)>;
 
-        single_recorder m_sr;
+        single_recorder<> m_sr;
         std::pair<tp_t, tp_t> m_record[sizeof...(Callables)];
 
         constexpr size_t loop_count() noexcept { return LoopNum; }

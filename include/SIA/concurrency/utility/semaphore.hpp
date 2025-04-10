@@ -16,12 +16,14 @@ namespace sia
     struct semaphore
     {
     private:
+        using self_t = semaphore;
         using value_t = ValueType;
         using atomic_t = std::atomic<value_t>;
 
         atomic_t m_count;
 
         constexpr value_t num_step(this auto&& self) noexcept { return value_t(1); }
+
     public:
         constexpr semaphore(value_t init = Limit) noexcept
             : m_count(init)
@@ -45,36 +47,15 @@ namespace sia
             { return false; }
         }
 
-        template <tags::wait Tag = tags::wait::busy, tags::time_unit Unit = tags::time_unit::seconds, typename Rep0 = float, typename Rep1 = float>
-        constexpr bool try_acquire(Rep0 try_time, Rep1 wait_time = Rep1()) noexcept
-        {
-            single_recorder sr{ };
-            sr.set();
-            do
-            {
-                if (this->try_acquire())
-                { return true; }
-                else
-                {
-                    wait<Tag>(wait_time);
-                    sr.now();
-                }
-            }
-            while(sr.result<Unit, Rep0>() < try_time);
-            return false;
-        }
+        template <tags::loop LoopTag = tags::loop::busy, tags::wait WaitTag = tags::wait::busy, typename LoopTimeType = default_rep_t, typename WaitTimeType = default_rep_t>
+        constexpr bool try_acquire_loop(LoopTimeType ltt_v = stamps::tools::empty_loop_val, WaitTimeType wtt_v = stamps::tools::empty_wait_val) noexcept
+        { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, static_cast<bool(self_t::*)()>(&self_t::try_acquire), this); }
 
-        template <tags::wait Tag = tags::wait::busy, typename Rep = float>
-        constexpr void acquire(Rep wait_time = Rep()) noexcept
-        {
-            while(!this->try_acquire())
-            { wait<Tag>(wait_time); }
-        }
+        template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_rep_t>
+        constexpr void acquire(WaitTimeType wtt_v = stamps::tools::empty_wait_val) noexcept
+        { try_acquire_loop<tags::loop::busy, WaitTag>(stamps::tools::empty_loop_val, wtt_v); }
 
         constexpr void release() noexcept
-        {
-            constexpr auto rlx = stamps::memory_orders::relaxed_v;
-            this->m_count.fetch_add(this->num_step(), rlx);
-        }
+        { this->m_count.fetch_add(this->num_step(), stamps::memory_orders::relaxed_v); }
     };
 } // namespace sia
