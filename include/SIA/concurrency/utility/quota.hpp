@@ -75,20 +75,17 @@ namespace sia
         
         constexpr void out() noexcept(quota_detail::is_out_nothrow<T>())
         {
-            if (this->m_own)
-            {
-                if constexpr (quota_detail::LockAble<T>)
-                { this->m_target.unlock(); }
-                else if constexpr (quota_detail::AcquireAble<T>)
-                { this->m_target.release(); }
-                else
-                { }
-                this->m_own = false;
-            }
+            if constexpr (quota_detail::LockAble<T>)
+            { this->m_target.unlock(); }
+            else if constexpr (quota_detail::AcquireAble<T>)
+            { this->m_target.release(); }
+            else
+            { }
+            this->m_own = false;
         }
 
         template <tags::quota ProcTag = Tag>
-        constexpr void proc_init_tag() noexcept(quota_detail::is_in_nothrow<T>())
+        constexpr void proc_tag() noexcept(quota_detail::is_in_nothrow<T>())
         {
             if constexpr (ProcTag == tags::quota::take)
             { this->in(); }
@@ -100,48 +97,41 @@ namespace sia
             { }
         }
 
-        constexpr void proc_init_tag(tags::quota tag) noexcept(quota_detail::is_in_nothrow<T>())
-        {
-            if (tag == tags::quota::take)
-            { this->proc_init_tag<tags::quota::take>(); }
-            else if (tag == tags::quota::try_take)
-            { this->proc_init_tag<tags::quota::try_take>(); }
-            else if (tag == tags::quota::have)
-            { this->proc_init_tag<tags::quota::have>(); }
-            else
-            { }
-        }
-
     public:
-        constexpr quota(T& arg, tags::quota tag) noexcept(quota_detail::is_in_nothrow<T>())
-            : m_target(arg), m_own()
-        { this->proc_init_tag(tag); }
-
         constexpr quota(T& arg) noexcept(quota_detail::is_in_nothrow<T>())
             : m_target(arg), m_own()
-        { this->proc_init_tag(); }
+        { this->proc_tag<Tag>(); }
 
         ~quota() noexcept(quota_detail::is_out_nothrow<T>())
-        { this->out(); }
+        { this->back(); }
 
         constexpr bool is_own() noexcept
         { return this->m_own; }
 
         constexpr bool take() noexcept(quota_detail::is_in_nothrow<T>())
         {
-            this->proc_init_tag();
+            if (this->is_own())
+            { }
+            else
+            { this->proc_tag<tags::quota::take>(); }
             return this->is_own();
         }
 
-        constexpr bool take(tags::quota tag) noexcept(quota_detail::is_in_nothrow<T>())
+        constexpr bool try_take() noexcept(quota_detail::is_in_nothrow<T>())
         {
-            this->proc_init_tag(tag);
+            if (this->is_own())
+            { }
+            else
+            { this->proc_tag<tags::quota::try_take>(); }
             return this->is_own();
         }
 
         constexpr bool back() noexcept(quota_detail::is_out_nothrow<T>())
         {
-            this->out();
+            if (this->is_own())
+            { this->out(); }
+            else
+            { }
             return !this->is_own();
         }
     };
