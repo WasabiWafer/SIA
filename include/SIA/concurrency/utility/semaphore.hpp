@@ -48,12 +48,12 @@ namespace sia
         }
 
         template <tags::loop LoopTag = tags::loop::busy, tags::wait WaitTag = tags::wait::busy, typename LoopTimeType = default_rep_t, typename WaitTimeType = default_rep_t>
-        constexpr bool try_acquire_loop(LoopTimeType ltt_v = stamps::tools::empty_loop_val, WaitTimeType wtt_v = stamps::tools::empty_wait_val) noexcept
+        constexpr bool try_acquire_loop(LoopTimeType ltt_v = stamps::basis::empty_loop_val, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
         { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, static_cast<bool(self_t::*)()>(&self_t::try_acquire), this); }
 
         template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_rep_t>
-        constexpr void acquire(WaitTimeType wtt_v = stamps::tools::empty_wait_val) noexcept
-        { try_acquire_loop<tags::loop::busy, WaitTag>(stamps::tools::empty_loop_val, wtt_v); }
+        constexpr void acquire(WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
+        { try_acquire_loop<tags::loop::busy, WaitTag>(stamps::basis::empty_loop_val, wtt_v); }
 
         constexpr void release() noexcept
         { this->m_count.fetch_add(this->num_step(), stamps::memory_orders::relaxed_v); }

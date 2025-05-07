@@ -13,7 +13,7 @@ namespace sia
 {
     namespace stamps
     {
-        namespace tools
+        namespace basis
         {
             constexpr default_rep_t empty_loop_val = 0;
             constexpr default_rep_t empty_wait_val = 0;
@@ -24,7 +24,7 @@ namespace sia
     namespace tools_detail
     {
         template <tags::wait Tag, typename TimeType = default_rep_t>
-        consteval bool is_wait_nothrow(TimeType time = stamps::tools::empty_wait_val) noexcept
+        consteval bool is_wait_nothrow(TimeType time = stamps::basis::empty_wait_val) noexcept
         {
             if constexpr (Tag == tags::wait::busy)
             { return true; }
@@ -40,7 +40,7 @@ namespace sia
     } // namespace tools_detial
     
     template <tags::wait Tag, typename TimeType = default_rep_t>
-    constexpr void wait(TimeType time = stamps::tools::empty_wait_val) noexcept(tools_detail::is_wait_nothrow<Tag, TimeType>())
+    constexpr void wait(TimeType time = stamps::basis::empty_wait_val) noexcept(tools_detail::is_wait_nothrow<Tag, TimeType>())
     {
         if constexpr (Tag == tags::wait::busy)
         { }

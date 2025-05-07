@@ -37,7 +37,7 @@ namespace sia
         compressed_pair<tail_allocator_t, composition_t> m_compair;
 
     private:
-        constexpr tail_allocator_t& get_tail_allocator(this auto&& self) noexcept { return self.m_compair.first(); }
+        constexpr tail_allocator_t& get_tail_allocator() noexcept { return this->m_compair.first(); }
         constexpr composition_t& get_composition(this auto&& self) noexcept { return self.m_compair.second(); }
         constexpr void deallocate_proc(this auto&& self, tail_data_t* ptr) noexcept(noexcept(tail_allocator_traits_t::deallocate(self.get_tail_allocator(), ptr, 1)) && noexcept(T().~T()))
         {

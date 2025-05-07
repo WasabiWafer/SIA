@@ -131,20 +131,21 @@ namespace sia
                 constexpr bool try_push_back(T&& arg) noexcept(noexcept(this->try_emplace_back(std::move(arg))))
                 { return this->try_emplace_back(std::move(arg)); }
 
-                template <tags::wait LoopTag = tags::wait::busy>
-                constexpr void pop_back(T& out) noexcept(noexcept(this->try_pop_back(out)))
-                { loop<LoopTag>(true, &ring::try_pop_back, this, out); }
+                template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_rep_t>
+                constexpr void pop_back(T& out, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept(noexcept(this->try_pop_back(out)))
+                { loop<tags::loop::busy, WaitTag>(true, stamps::basis::empty_loop_val, wtt_v, &ring::try_pop_back, this, out); }
 
-                template <tags::wait LoopTag = tags::wait::busy>
-                constexpr void push_back(const T& arg) noexcept(noexcept(this->try_push_back(arg)))
-                { loop<LoopTag>(true, static_cast<bool(ring::*)(const T&)>(&ring::try_push_back), this, arg); }
-                template <tags::wait LoopTag = tags::wait::busy>
-                constexpr void push_back(T&& arg) noexcept(noexcept(this->try_push_back(std::move(arg))))
-                { loop<LoopTag>(true, static_cast<bool(ring::*)(T&&)>(&ring::try_push_back), this, std::move(arg)); }
+                template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_rep_t>
+                constexpr void push_back(const T& arg, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept(noexcept(this->try_push_back(arg)))
+                { loop<tags::loop::busy, WaitTag>(true, stamps::basis::empty_loop_val, wtt_v, static_cast<bool(ring::*)(const T&)>(&ring::try_push_back), this, arg); }
 
-                template <tags::wait LoopTag = tags::wait::busy, typename... Tys>
-                constexpr void emplace_back(Tys&&... args) noexcept(noexcept(this->try_emplace_back(std::forward<Tys>(args)...)))
-                { loop<LoopTag>(true, &ring::try_emplace_back<Tys...>, this, std::forward<Tys>(args)...); }
+                template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_rep_t>
+                constexpr void push_back(T&& arg, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept(noexcept(this->try_push_back(std::move(arg))))
+                { loop<tags::loop::busy, WaitTag>(true, stamps::basis::empty_loop_val, wtt_v, static_cast<bool(ring::*)(T&&)>(&ring::try_push_back), this, std::move(arg)); }
+
+                template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_rep_t, typename... Tys>
+                constexpr void emplace_back(WaitTimeType wtt_v, Tys&&... args) noexcept(noexcept(this->try_emplace_back(std::forward<Tys>(args)...)))
+                { loop<tags::loop::busy, WaitTag>(true, stamps::basis::empty_loop_val, wtt_v, &ring::try_emplace_back<Tys...>, this, std::forward<Tys>(args)...); }
                 
                 constexpr bool try_pop_front(T& out) noexcept(noexcept(out = T()) && noexcept(value_t().~value_t()))
                 {
