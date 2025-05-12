@@ -10,17 +10,19 @@
 
 namespace sia
 {
+    template <typename T>
+        requires (decltype(std::declval<volatile std::atomic<int>>()){ }.is_always_lock_free)
     struct state
     {
     private:
-        using atomic_t = volatile std::atomic<tags::object_state>;
+        using atomic_t = volatile std::atomic<T>;
         atomic_t m_state;
     public:
         constexpr state() noexcept = default;
         constexpr state(state& arg) noexcept
             : m_state(arg.status())
         { }
-        constexpr state(const tags::object_state& arg) noexcept
+        constexpr state(const T& arg) noexcept
             : m_state(arg)
         { }
         constexpr state& operator=(state& arg) noexcept
@@ -29,13 +31,13 @@ namespace sia
             return *this;
         }
 
-        constexpr tags::object_state status() noexcept
+        T status() noexcept
         { return m_state.load(stamps::memory_orders::relaxed_v); }
 
-        constexpr void set(tags::object_state arg) noexcept
+        void set(const T& arg) noexcept
         { m_state.store(arg, stamps::memory_orders::relaxed_v); }
 
-        constexpr bool compare_exchange(tags::object_state& expt, tags::object_state desr) noexcept
+        bool compare_exchange(tags::object_state& expt, const T& desr) noexcept
         { return m_state.compare_exchange_weak(expt, desr, stamps::memory_orders::relaxed_v, stamps::memory_orders::relaxed_v); }
     };
 } // namespace sia
