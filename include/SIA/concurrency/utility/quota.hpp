@@ -99,7 +99,7 @@ namespace sia
         }
 
     public:
-        constexpr quota(T& arg, const tags::quota& tag = tags::quota::take) noexcept(quota_detail::is_in_nothrow<T>())
+        constexpr quota(T& arg, tags::quota tag = tags::quota::take) noexcept(quota_detail::is_in_nothrow<T>())
             : m_target(arg), m_own(false)
         { this->proc_tag(tag); }
 
@@ -136,5 +136,5 @@ namespace sia
     };
 
     template <quota_detail::QuotaReq T>
-    quota(T&& arg, const tags::quota& tag) -> quota<std::remove_reference_t<T>>;
+    quota(T&& arg, tags::quota tag) -> quota<std::remove_reference_t<T>>;
 } // namespace sia

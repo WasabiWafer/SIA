@@ -2,6 +2,8 @@
 
 #include <type_traits>
 #include <utility>
+#include <string>
+#include <string_view>
 
 #include "SIA/utility/tools.hpp"
 

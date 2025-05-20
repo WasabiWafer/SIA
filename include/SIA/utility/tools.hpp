@@ -40,17 +40,27 @@ namespace sia
     struct is_same_any<T> : public std::false_type { };
     template <typename T, typename... Ts>
     constexpr const bool is_same_any_v = is_same_any<T, Ts...>::value;
+    
+    template <auto Func, typename... Args>
+    struct is_nothrow_function : std::bool_constant<requires() { {Func(Args()...)} noexcept; }> { };
+    template <auto Func, typename... Args>
+    constexpr const bool is_nothrow_function_v = is_nothrow_function<Func, Args...>::value;
+
+    template <typename Class, auto Func, typename... Args>
+    struct is_nothrow_member_function : std::bool_constant<requires(Class c) { {(c.*Func)(Args()...)} noexcept; }> { };
+    template <typename Class, auto Func, typename... Args>
+    constexpr const bool is_nothrow_member_function_v = is_nothrow_member_function<Class, Func, Args...>::value;
 
     template <typename... Ts>
     struct type_list { using type = type_list; };
     template <auto... Es>
     struct entity_list { using type = entity_list; };
     
-    template <typename T, size_t N, tags::memory_locations Tag = tags::memory_locations::stack, typename Allocator = std::allocator<T>>
+    template <typename T, size_t N, tags::memory_location Tag = tags::memory_location::stack, typename Allocator = std::allocator<T>>
     struct chunk;
     
     template <typename T, size_t N, typename Allocator>
-    struct chunk<T, N, tags::memory_locations::heap, Allocator>
+    struct chunk<T, N, tags::memory_location::heap, Allocator>
     {
         private:
         using allocator_traits_t = std::allocator_traits<Allocator>;
@@ -67,7 +77,7 @@ namespace sia
     };
 
     template <typename T, size_t N>
-    struct chunk<T, N, tags::memory_locations::stack>
+    struct chunk<T, N, tags::memory_location::stack>
     {
         // no private member for Aggregate initialization.
         T m_bin[N];

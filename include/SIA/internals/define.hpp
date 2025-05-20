@@ -26,14 +26,16 @@ namespace sia
 {
     namespace tags
     {
-        enum class numbers { zero, one, two, three, four, five, six, seven, eight, nine };
-        enum class lower_letters { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z };
-        enum class upper_letters { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z };
-        enum class memory_locations { stack, heap };
+        enum class number { zero, one, two, three, four, five, six, seven, eight, nine };
+        enum class lower_letter { a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z };
+        enum class upper_letter { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z };
+        enum class memory_location { stack, heap };
         enum class life_cycle { allocated, constructed, destructed, deallocated };
         enum class object_state { occupy, allocating, allocated, constructing, constructed, destructing, destructed, vacate };
         enum class os { windows, linux, other };
         enum class arch { x32, x64, other };
+        enum class value_category { glvalue, prvalue, xvalue, lvalue, rvalue };
+        enum class type_qualifier { none, const_type, volatile_type, const_volatile_type, reference_type };
     } // namespace tag
 } // namespace sia
 
@@ -94,6 +96,12 @@ namespace sia
             constexpr const auto os_v = stamps_detail::get_os();
             constexpr const auto os_bit_v = stamps_detail::get_os_bit();
             constexpr const auto arch_v = stamps_detail::get_architecture();
-        } // namespace system        
+        } // namespace system
+
+        namespace basis
+        {
+            constexpr const bool true_value = true;
+            constexpr const bool false_value = false;
+        } // namespace basis
     } // namespace stamps
 } // namespace sia
