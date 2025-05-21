@@ -29,7 +29,7 @@ namespace sia
         };
 
         template <typename Func>
-        struct function_detail { };
+        struct function_detail;
 
         // basic function begin
         template <typename ReturnType, typename... ArgTypes>
@@ -201,7 +201,7 @@ namespace sia
     template <typename FuncPtrType>
     using function_info_t = function_pointer_detail::function_detail<FuncPtrType>;
 
-    template <typename FuncPtrType, typename ArgTypeList = function_pointer_detail::function_detail<FuncPtrType>::template arg_type_list_t>
+    template <typename FuncPtrType, typename ArgTypeList = function_info_t<FuncPtrType>::template arg_type_list_t>
     struct function_pointer;
 
     // for raw fp

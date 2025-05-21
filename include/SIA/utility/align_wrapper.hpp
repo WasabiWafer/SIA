@@ -36,49 +36,49 @@ namespace sia
         using self_t = align_wrapper;
 
     public:
-        constexpr align_wrapper() noexcept(noexcept(std::construct_at(this->self_t::ptr())))
+        constexpr align_wrapper() noexcept(std::is_nothrow_default_constructible_v<T>)
             : base_t()
         { std::construct_at(this->self_t::ptr()); }
 
-        constexpr align_wrapper(const align_wrapper& arg) noexcept(noexcept(std::construct_at(this->self_t::ptr(), arg.ref())))
+        constexpr align_wrapper(const align_wrapper& arg) noexcept(std::is_nothrow_copy_constructible_v<T>)
             : base_t()
         { std::construct_at(this->self_t::ptr(), arg.ref()); }
 
-        constexpr align_wrapper(align_wrapper&& arg) noexcept(noexcept(std::construct_at(this->self_t::ptr(), std::move(arg.ref()))))
+        constexpr align_wrapper(align_wrapper&& arg) noexcept(std::is_nothrow_move_constructible_v<T>)
             : base_t()
         { std::construct_at(this->self_t::ptr(), std::move(arg.ref())); }
 
         template <typename Ty, typename... Tys>
             requires (!std::is_same_v<std::remove_cvref_t<Ty>, align_wrapper>)
-        constexpr align_wrapper(Ty&& arg, Tys&&... args) noexcept(noexcept(std::construct_at(this->self_t::ptr(), std::forward<Ty>(arg), std::forward<Tys>(args)...)))
+        constexpr align_wrapper(Ty&& arg, Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Ty, Tys...>)
             : base_t()
         { std::construct_at(this->self_t::ptr(), std::forward<Ty>(arg), std::forward<Tys>(args)...); }
 
         ~align_wrapper() noexcept(noexcept(std::destroy_at(this->self_t::ptr())))
         { std::destroy_at(this->self_t::ptr()); }
 
-        constexpr align_wrapper& operator=(const align_wrapper& arg) noexcept(noexcept(this->ref() = arg.ref()))
+        constexpr align_wrapper& operator=(const align_wrapper& arg) noexcept(std::is_nothrow_copy_assignable_v<T>)
         {
             if (this->self_t::ptr() != arg.ptr())
             { this->ref() = arg.ref(); }
             return *this;
         }
 
-        constexpr align_wrapper& operator=(align_wrapper&& arg) noexcept(noexcept(this->ref() = std::move(arg.ref())))
+        constexpr align_wrapper& operator=(align_wrapper&& arg) noexcept(std::is_nothrow_move_assignable_v<T>)
         {
             if (this->self_t::ptr() != arg.ptr())
             { this->ref() = std::move(arg.ref()); }
             return *this;
         }
 
-        constexpr align_wrapper& operator=(const T& arg) noexcept(noexcept(this->ref() = arg))
+        constexpr align_wrapper& operator=(const T& arg) noexcept(std::is_nothrow_copy_assignable_v<T>)
         {
             if (this->self_t::ptr() != &arg)
             { this->ref() = arg; }
             return *this;
         }
 
-        constexpr align_wrapper& operator=(T&& arg) noexcept(noexcept(this->ref() = std::move(arg)))
+        constexpr align_wrapper& operator=(T&& arg) noexcept(std::is_nothrow_move_assignable_v<T>)
         {
             if (this->self_t::ptr() != &arg)
             { this->ref() = std::move(arg); }
