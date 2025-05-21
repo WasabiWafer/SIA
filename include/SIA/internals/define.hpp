@@ -34,8 +34,9 @@ namespace sia
         enum class object_state { occupy, allocating, allocated, constructing, constructed, destructing, destructed, vacate };
         enum class os { windows, linux, other };
         enum class arch { x32, x64, other };
-        enum class value_category { glvalue, prvalue, xvalue, lvalue, rvalue };
         enum class type_qualifier { none, const_type, volatile_type, const_volatile_type, reference_type };
+        enum class value_category { glvalue, prvalue, xvalue, lvalue, rvalue, void_value };
+        enum class reference_category { none, lvalue, rvalue };
     } // namespace tag
 } // namespace sia
 
