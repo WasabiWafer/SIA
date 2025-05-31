@@ -31,11 +31,11 @@ namespace sia
             return this->m_owner.compare_exchange_weak(default_thread_id_v, this->get_thread_id(), stamps::memory_orders::relaxed_v, stamps::memory_orders::relaxed_v);
         }
 
-        template <tags::loop LoopTag = tags::loop::busy, tags::wait WaitTag = tags::wait::busy, typename LoopTimeType = default_rep_t, typename WaitTimeType = default_rep_t>
+        template <tags::loop LoopTag = tags::loop::busy, tags::wait WaitTag = tags::wait::busy, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
         bool try_lock_loop(LoopTimeType ltt_v = stamps::basis::empty_loop_val, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
         { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, &self_t::try_lock, this); }
 
-        template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_rep_t>
+        template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_time_rep_t>
         void lock(WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
         { try_lock_loop<tags::loop::busy, WaitTag>(stamps::basis::empty_loop_val, wtt_v); }
         

@@ -54,7 +54,7 @@ namespace sia
             : base_t()
         { std::construct_at(this->self_t::ptr(), std::forward<Ty>(arg), std::forward<Tys>(args)...); }
 
-        ~align_wrapper() noexcept(noexcept(std::destroy_at(this->self_t::ptr())))
+        ~align_wrapper() noexcept(std::is_nothrow_destructible_v<T>)
         { std::destroy_at(this->self_t::ptr()); }
 
         constexpr align_wrapper& operator=(const align_wrapper& arg) noexcept(std::is_nothrow_copy_assignable_v<T>)

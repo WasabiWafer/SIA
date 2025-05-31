@@ -9,7 +9,7 @@
 
 namespace sia
 {
-    using default_rep_t = long long;
+    using default_time_rep_t = long long;
 
     namespace tags
     {
@@ -18,7 +18,7 @@ namespace sia
     
     namespace recorder_detail
     {
-        template <tags::time_unit Tag, typename Rep = default_rep_t>
+        template <tags::time_unit Tag, typename Rep = default_time_rep_t>
         struct time_exp;
         template <typename Rep>
         struct time_exp<tags::time_unit::nanoseconds, Rep> { using type = std::chrono::duration<Rep, std::nano>; };
@@ -34,7 +34,7 @@ namespace sia
         struct time_exp<tags::time_unit::hours, Rep> { using type = std::chrono::duration<Rep, std::ratio<3600>>; };
     } // namespace recorder_detail
 
-    template <tags::time_unit Unit, typename Rep = default_rep_t>
+    template <tags::time_unit Unit, typename Rep = default_time_rep_t>
     using time_exp_t = recorder_detail::time_exp<Unit, Rep>::type;
     
     template <size_t LoopNum, auto... Callables>
@@ -53,7 +53,7 @@ namespace sia
     public:
         void set() noexcept { m_record[0] = clock_t::now(); }
         void now() noexcept { m_record[1] = clock_t::now(); }
-        template <tags::time_unit Unit, typename Rep = default_rep_t>
+        template <tags::time_unit Unit, typename Rep = default_time_rep_t>
         Rep result() noexcept { return std::chrono::duration_cast<time_exp_t<Unit, Rep>>(m_record[1] - m_record[0]).count(); }
         auto result() noexcept { return m_record[1] - m_record[0]; }
         std::span<tp_t, 2> get_span() noexcept { return m_record; }

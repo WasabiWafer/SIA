@@ -15,15 +15,15 @@ namespace sia
     {
         namespace basis
         {
-            constexpr default_rep_t empty_loop_val = 0;
-            constexpr default_rep_t empty_wait_val = 0;
+            constexpr default_time_rep_t empty_loop_val = 0;
+            constexpr default_time_rep_t empty_wait_val = 0;
         } // namespace tools
     } // namespace stamps
     
 
     namespace tools_detail
     {
-        template <tags::wait Tag, typename TimeType = default_rep_t>
+        template <tags::wait Tag, typename TimeType = default_time_rep_t>
         consteval bool is_wait_nothrow(TimeType time = stamps::basis::empty_wait_val) noexcept
         {
             if constexpr (Tag == tags::wait::busy)
@@ -39,7 +39,7 @@ namespace sia
         }
     } // namespace tools_detial
     
-    template <tags::wait Tag, typename TimeType = default_rep_t>
+    template <tags::wait Tag, typename TimeType = default_time_rep_t>
     constexpr void wait(TimeType time = stamps::basis::empty_wait_val) noexcept(tools_detail::is_wait_nothrow<Tag, TimeType>())
     {
         if constexpr (Tag == tags::wait::busy)
@@ -56,7 +56,7 @@ namespace sia
 
     namespace tools_detail
     {
-        template <tags::wait WaitTag , typename Func, typename... Ts, typename CompType, typename WaitTimeType = default_rep_t>
+        template <tags::wait WaitTag , typename Func, typename... Ts, typename CompType, typename WaitTimeType = default_time_rep_t>
         constexpr bool busy_loop_impl(CompType&& loop_out_cond, WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
         {
             while (loop_out_cond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
@@ -64,7 +64,7 @@ namespace sia
             return true;
         }
 
-        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename WaitTimeType = default_rep_t>
+        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename WaitTimeType = default_time_rep_t>
         constexpr bool n_loop_impl(CompType&& loop_out_cond, size_t n , WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
         {
             for (size_t count { }; count < n; ++count)
@@ -77,7 +77,7 @@ namespace sia
             return false;
         }
 
-        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename Ratio, typename Rep = default_rep_t, typename WaitTimeType = default_rep_t>
+        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename Ratio, typename Rep = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
         constexpr bool for_loop_impl(CompType&& loop_out_cond, std::chrono::duration<Rep, Ratio> time, WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
         {
             single_recorder sr { };
@@ -96,7 +96,7 @@ namespace sia
             return false;
         }
 
-        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename Clock, typename Duration, typename WaitTimeType = default_rep_t>
+        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename Clock, typename Duration, typename WaitTimeType = default_time_rep_t>
         constexpr bool until_loop_impl(CompType&& loop_out_cond, std::chrono::time_point<Clock, Duration> tp, WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
         {
             do
@@ -111,7 +111,7 @@ namespace sia
         }
     } // namespace tools_detail
 
-    template <tags::loop LoopTag, tags::wait WaitTag = tags::wait::busy, typename Func, typename... Ts, typename CompType, typename LoopTimeType = default_rep_t, typename WaitTimeType = default_rep_t>
+    template <tags::loop LoopTag, tags::wait WaitTag = tags::wait::busy, typename Func, typename... Ts, typename CompType, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
         requires (std::is_invocable_v<Func, Ts...>)
     constexpr bool loop(CompType&& loop_out_cond, LoopTimeType lt_v, WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
     {

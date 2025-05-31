@@ -136,5 +136,5 @@ namespace sia
     };
 
     template <quota_detail::QuotaReq T>
-    quota(T&& arg, tags::quota tag) -> quota<std::remove_reference_t<T>>;
+    quota(T&& arg, tags::quota tag = tags::quota::take) -> quota<std::remove_reference_t<T>>;
 } // namespace sia
