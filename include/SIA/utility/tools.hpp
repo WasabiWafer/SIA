@@ -20,9 +20,6 @@ namespace sia
     template <typename... Ts> struct STRUCT_NAME : public Ts... { using Ts::TARGET_FUNC_NAME...; };\
     template <typename... Ts> STRUCT_NAME(Ts...) -> STRUCT_NAME<Ts...>;
 
-    // template <auto Data>
-    // constexpr const auto& make_static() noexcept { return Data; }
-
     template <typename To, typename From>
     constexpr To type_cast(const From& arg) noexcept { return std::bit_cast<To>(arg); }
 
@@ -58,6 +55,9 @@ namespace sia
         constexpr const auto& operator()(this auto&& self) noexcept { return value; }
     };
 
+    template <typename T>
+    using type = T;
+
     template <typename... Ts>
     struct type_list { using type = type_list; };
     template <auto... Es>
@@ -87,6 +87,7 @@ namespace sia
         { using type = entity_list<Func(Es)...>; };
 
     } // namespace tools_detail
+
     template <auto Func, typename EntityList>
     using bind_entity_list = tools_detail::bind_entity_list_impl<Func, EntityList>::type;
     template <typename T0, typename T1>
@@ -101,29 +102,29 @@ namespace sia
     struct chunk<T, N, tags::memory_location::heap, Allocator>
     {
         private:
-        using allocator_traits_t = std::allocator_traits<Allocator>;
-        compressed_pair<Allocator, T*> m_compair;
+            using allocator_traits_t = std::allocator_traits<Allocator>;
+            compressed_pair<Allocator, T*> m_compair;
         public:
-        constexpr chunk(const Allocator& alloc = Allocator()) noexcept(noexcept(Allocator(alloc)) && noexcept(allocator_traits_t::allocate(alloc, N)))
-            : m_compair(splits::one_v, alloc)
-        { m_compair.second() = allocator_traits_t::allocate(m_compair.first(), N);}
-        ~chunk() noexcept(noexcept(allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), N)))
-        { allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), N); }
+            constexpr chunk(const Allocator& alloc = Allocator()) noexcept(noexcept(Allocator(alloc)) && noexcept(allocator_traits_t::allocate(alloc, N)))
+                : m_compair(splits::one_v, alloc)
+            { m_compair.second() = allocator_traits_t::allocate(m_compair.first(), N);}
+            ~chunk() noexcept(noexcept(allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), N)))
+            { allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), N); }
 
-        constexpr T* ptr() noexcept { return m_compair.second(); }
-        constexpr const T* ptr() const noexcept { return m_compair.second(); }
+            constexpr T* ptr() noexcept { return m_compair.second(); }
+            constexpr const T* ptr() const noexcept { return m_compair.second(); }
     };
 
     template <typename T, size_t N>
     struct chunk<T, N, tags::memory_location::stack>
     {
         // no private member for Aggregate initialization.
-        T m_bin[N];
-        constexpr T* ptr(size_t pos = 0) noexcept { return static_cast<T*>(m_bin) + pos; }
-        constexpr const T* ptr(size_t pos = 0) const noexcept { return static_cast<const T*>(m_bin) + pos; }
-        constexpr T& ref(size_t pos = 0) noexcept { return this->m_bin[pos]; }
-        constexpr const T& ref(size_t pos = 0) const noexcept { return this->m_bin[pos]; }
-        constexpr T& operator[](const size_t& pos) noexcept { return this->m_bin[pos]; }
-        constexpr const T& operator[](const size_t& pos) const noexcept { return this->m_bin[pos]; }
+        T m_chunk[N];
+        constexpr T* ptr(size_t pos = 0) noexcept { return static_cast<T*>(m_chunk) + pos; }
+        constexpr const T* ptr(size_t pos = 0) const noexcept { return static_cast<const T*>(m_chunk) + pos; }
+        constexpr T& ref(size_t pos = 0) noexcept { return this->m_chunk[pos]; }
+        constexpr const T& ref(size_t pos = 0) const noexcept { return this->m_chunk[pos]; }
+        constexpr T& operator[](const size_t& pos) noexcept { return this->m_chunk[pos]; }
+        constexpr const T& operator[](const size_t& pos) const noexcept { return this->m_chunk[pos]; }
     };
 } // namespace sia

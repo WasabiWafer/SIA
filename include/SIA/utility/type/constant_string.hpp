@@ -11,37 +11,57 @@ namespace sia
 {
     namespace constant_string_detail
     {
-        template <typename T> concept CharReq = is_same_any_v<std::remove_cvref_t<T>, signed char, unsigned char, char, wchar_t, char16_t, char32_t>;
-        template <typename T> concept ArrReq = std::is_array_v<std::remove_cvref_t<T>>;
-        template <typename T> concept CStrReq = ArrReq<T> && CharReq<std::remove_extent_t<std::remove_cvref_t<T>>>;
+        template <typename T> concept CharType = is_same_any_v<std::remove_cvref_t<T>, signed char, unsigned char, char, wchar_t, char16_t, char32_t>;
+        template <typename T> concept ArrType = std::is_array_v<std::remove_cvref_t<T>>;
+        template <typename T> concept CStrReq = ArrType<T> && CharType<std::remove_extent_t<std::remove_cvref_t<T>>>;
+    } // namespace constant_string_detail
 
-        template <typename T, size_t N>
-        struct constant_string_impl : public chunk<T, N>
-        {
+    template <constant_string_detail::CharType T, size_t N, typename SeqType = std::make_index_sequence<N>>
+    struct constant_string;
+
+    template <constant_string_detail::CharType T, size_t N, size_t... Seqs>
+    struct constant_string<T, N, std::index_sequence<Seqs...>> : private chunk<T, N>
+    {
         private:
             using base_t = chunk<T, N>;
         public:
-            constexpr constant_string_impl() noexcept = default;
-            template <size_t... Idxs>
-            constexpr constant_string_impl(const T (&arg)[N], std::index_sequence<Idxs...>) noexcept : base_t{arg[Idxs]...} { }
-        };
-    } // namespace constant_string_detail
-    
-    template <constant_string_detail::CharReq T, size_t N>
-    struct constant_string : public constant_string_detail::constant_string_impl<T, N>
-    {
-    private:
-        using base_t = constant_string_detail::constant_string_impl<T, N>;
-    public:
-        constexpr constant_string() noexcept = default;
-        constexpr constant_string(const T (&arg)[N]) noexcept : base_t(arg, std::make_index_sequence<N>()) { }
-        constexpr size_t length(this auto&& self) noexcept { return N; }
-        constexpr       T* begin()  noexcept        { return this->ptr(); }
-        constexpr const T* begin()  const noexcept  { return this->ptr(); }
-        constexpr       T* end()    noexcept        { return this->begin() + this->length(); }
-        constexpr const T* end()    const noexcept  { return this->begin() + this->length(); }
-        constexpr std::string_view to_string_view(this auto&& self) noexcept { return std::string_view(self.begin(), self.length()); }
-        constexpr std::string to_string(this auto&& self) noexcept { return std::string(self.begin(), self.length()); }
+            constexpr constant_string() noexcept = default;
+
+            constexpr constant_string(const constant_string&) noexcept = default;
+            constexpr constant_string& operator=(const constant_string&) noexcept = default;
+
+            constexpr constant_string(constant_string&&) noexcept = default;
+            constexpr constant_string& operator=(constant_string&&) noexcept = default;
+
+            constexpr constant_string(const T (&arg)[N]) noexcept : base_t(arg[Seqs]...) { }
+            template <constant_string_detail::CharType Ty, size_t Size>
+                requires (Size <= N)
+            constexpr constant_string& operator=(const Ty(&arg)[Size]) noexcept
+            {
+                size_t idx{ };
+                // if (Size < N)
+                // {
+                    for (; idx < Size; ++idx)
+                    { this->ref(idx) = arg[idx]; }
+                    for (; idx < N; ++idx)
+                    { this->ref(idx) = '\0'; }
+                // }
+                // else
+                // {
+                //     for (; idx < N - 1; ++idx)
+                //     { this->ref(idx) = arg[idx]; }
+                //     this->ref(idx) = '\0';
+                // }
+                return *this;
+            }
+
+            constexpr size_t length(this auto&& self) noexcept { return N; }
+            constexpr       T* begin()  noexcept        { return this->ptr(); }
+            constexpr const T* begin()  const noexcept  { return this->ptr(); }
+            constexpr       T* end()    noexcept        { return this->begin() + this->length(); }
+            constexpr const T* end()    const noexcept  { return this->begin() + this->length(); }
+            constexpr std::string_view to_string_view(this auto&& self) noexcept { return std::string_view(self.begin(), self.length()); }
+            constexpr std::string to_string(this auto&& self) noexcept { return std::string(self.begin(), self.length()); }
     };
 
     template <constant_string_detail::CStrReq T>

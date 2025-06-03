@@ -11,11 +11,12 @@ namespace sia
 {
     template <typename... Ts>
     struct type_index;
-    template <typename IndexSeq_t, typename TypeList_t>
-    struct type_decomposition;
 
     namespace type_index_detail
     {
+        template <typename IndexSeq_t, typename TypeList_t>
+        struct type_decomposition;
+
         SIA_MACRO_GEN_OVERLOAD(map_overload, map)
 
         template <typename T0, typename T1>
@@ -47,34 +48,36 @@ namespace sia
             };
             using result = entity<count_true_type()>;
         };
-    } // namespace type_index_detail
+
+        template <size_t Idx, typename T>
+        struct type_token
+        {
+            template <size_t N>
+                requires (Idx == N)
+            constexpr T map(this auto&& self) noexcept;
+        };
     
-    template <size_t Idx, typename T>
-    struct type_token
-    {
-        template <size_t N>
-            requires (Idx == N)
-        constexpr T map(this auto&& self) noexcept;
-    };
-
-    template <size_t... Idxs, typename... Ts>
-    requires (sizeof...(Ts) > 0)
-    struct type_decomposition<std::index_sequence<Idxs...>, type_list<Ts...>>
-    {
-        static constexpr type_index_detail::map_overload mapper { type_token<Idxs, Ts>{ }... };
-        template <size_t N>
-        using at = decltype(mapper.map<N>());
-        using back = at<sizeof...(Ts) - 1>;
-        using front = at<0>;
-    };
-
-    template <size_t... Idxs, typename... Ts>
-        requires (sizeof...(Ts) < 1)
-    struct type_decomposition<std::index_sequence<Idxs...>, type_list<Ts...>>
-    { };
+        template <size_t... Idxs, typename... Ts>
+        requires (sizeof...(Ts) > 0)
+        struct type_decomposition<std::index_sequence<Idxs...>, type_list<Ts...>>
+        {
+            private:
+                static constexpr map_overload mapper { type_token<Idxs, Ts>{ }... };
+            public:
+                template <size_t N>
+                using at = decltype(mapper.map<N>());
+                using back = at<sizeof...(Ts) - 1>;
+                using front = at<0>;
+        };
+    
+        template <size_t... Idxs, typename... Ts>
+            requires (sizeof...(Ts) < 1)
+        struct type_decomposition<std::index_sequence<Idxs...>, type_list<Ts...>>
+        { };
+    } // namespace type_index_detail
 
     template <typename... Ts>
-    struct type_index : type_decomposition<std::make_index_sequence<sizeof...(Ts)>, type_list<Ts...>>
+    struct type_index : type_index_detail::type_decomposition<std::make_index_sequence<sizeof...(Ts)>, type_list<Ts...>>
     {
         template <size_t Begin, size_t End> requires (Begin < End)
         using select = type_index_detail::select_impl<type_index, bind_entity_list<[](size_t x){return x + Begin;}, make_entity_sequence<size_t, End - Begin>>>::type;

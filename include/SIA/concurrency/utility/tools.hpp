@@ -39,8 +39,8 @@ namespace sia
         }
     } // namespace tools_detial
     
-    template <tags::wait Tag, typename TimeType = default_time_rep_t>
-    constexpr void wait(TimeType time = stamps::basis::empty_wait_val) noexcept(tools_detail::is_wait_nothrow<Tag, TimeType>())
+    template <tags::wait Tag, typename WaitTimeType = default_time_rep_t>
+    constexpr void wait(WaitTimeType time = stamps::basis::empty_wait_val) noexcept(tools_detail::is_wait_nothrow<Tag, WaitTimeType>())
     {
         if constexpr (Tag == tags::wait::busy)
         { }

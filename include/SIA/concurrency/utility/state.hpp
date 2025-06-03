@@ -11,7 +11,7 @@
 namespace sia
 {
     template <typename T>
-        requires (decltype(std::declval<volatile std::atomic<int>>()){ }.is_always_lock_free)
+        requires (type<volatile std::atomic<T>>::is_always_lock_free)
     struct state
     {
     private:
@@ -19,7 +19,7 @@ namespace sia
         atomic_t m_state;
     public:
         constexpr state() noexcept = default;
-        constexpr state(state& arg) noexcept
+        constexpr state(const state& arg) noexcept
             : m_state(arg.status())
         { }
         constexpr state(const T& arg) noexcept
