@@ -37,21 +37,38 @@ namespace sia
     template <typename T, typename... Ts>
     constexpr const bool is_same_any_v = is_same_any<T, Ts...>::value;
     
+    // namespace tools_detail
+    // {
+    //     template <auto Func, typename Arg, typename... Args>
+    //     struct is_nothrow_raw_function : std::bool_constant<requires() { {Func(Arg{ }, Args{ }...)} noexcept; }> { };
+    //     template <auto Func, typename... Args>
+    //     constexpr const bool is_nothrow_function_v = is_nothrow_function<Func, Args...>::value;
+    
+    //     template <auto Func, typename Class, typename... Args>
+    //     struct is_nothrow_member_function : std::bool_constant<requires(Class c) { {(c.*Func)(Args{ }...)} noexcept; }> { };
+    //     template <typename Class, auto Func, typename... Args>
+    //     constexpr const bool is_nothrow_member_function_v = is_nothrow_member_function<Class, Func, Args...>::value;
+    // } // namespace tools_detail
+    
     template <auto Func, typename... Args>
-    struct is_nothrow_function : std::bool_constant<requires() { {Func(Args()...)} noexcept; }> { };
+    struct is_nothrow_function;
+
+    template <auto Func, typename... Args>
+        requires (std::is_pointer_v<decltype(Func)> && std::is_function_v<std::remove_pointer_t<decltype(Func)>>)
+    struct is_nothrow_function<Func, Args...> : std::bool_constant<requires() { {Func(Args{ }...)} noexcept; }> { };
+
+    template <auto Func, typename Class, typename... Args>
+        requires (std::is_member_function_pointer_v<decltype(Func)>)
+    struct is_nothrow_function<Func, Class, Args...> : std::bool_constant<requires(Class c) { {(c.*Func)(Args{ }...)} noexcept; }> { };
+    
     template <auto Func, typename... Args>
     constexpr const bool is_nothrow_function_v = is_nothrow_function<Func, Args...>::value;
-
-    template <typename Class, auto Func, typename... Args>
-    struct is_nothrow_member_function : std::bool_constant<requires(Class c) { {(c.*Func)(Args()...)} noexcept; }> { };
-    template <typename Class, auto Func, typename... Args>
-    constexpr const bool is_nothrow_member_function_v = is_nothrow_member_function<Class, Func, Args...>::value;
 
     template <auto E>
     struct entity
     {
         using type = decltype(E);
-        static constexpr const auto& value = E;
+        static constexpr const auto value = E;
         constexpr const auto& operator()(this auto&& self) noexcept { return value; }
     };
 

@@ -288,6 +288,9 @@ namespace sia
         // member function end
     };
 
+    // template <auto FuncPtr>
+    // constexpr const bool is_nothrow_function_v = function_info_t<decltype(FuncPtr)>::nothrow_flag;
+
     template <typename FuncPtrType>
         requires ((std::is_pointer_v<FuncPtrType> && std::is_function_v<std::remove_pointer_t<FuncPtrType>>) || std::is_member_function_pointer_v<FuncPtrType>)
     function_pointer(FuncPtrType&&) -> function_pointer<std::remove_reference_t<FuncPtrType>>;

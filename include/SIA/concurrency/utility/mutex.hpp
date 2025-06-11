@@ -18,7 +18,7 @@ namespace sia
             atomic_t m_owner;
 
             thread_id_t get_thread_id() noexcept
-            { return sia::stamps::this_thread::id_v; }
+            { return stamps::this_thread::id_v; }
 
         public:
             constexpr mutex() noexcept : m_owner()
@@ -43,6 +43,8 @@ namespace sia
                 if (this->m_owner.load(stamps::memory_orders::relaxed_v) == this->get_thread_id())
                 { this->m_owner.store(thread_id_t{ }, stamps::memory_orders::relaxed_v); }
             }
+
+            thread_id_t owner() noexcept { return m_owner.load(stamps::memory_orders::relaxed_v); }
 
             void force_lock() noexcept
             { this->m_owner.store(this->get_thread_id(), stamps::memory_orders::relaxed_v); }

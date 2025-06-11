@@ -20,7 +20,7 @@ namespace sia
     struct constant_string;
 
     template <constant_string_detail::CharType T, size_t N, size_t... Seqs>
-    struct constant_string<T, N, std::index_sequence<Seqs...>> : private chunk<T, N>
+    struct constant_string<T, N, std::index_sequence<Seqs...>> : public chunk<T, N>
     {
         private:
             using base_t = chunk<T, N>;
@@ -62,6 +62,37 @@ namespace sia
             constexpr const T* end()    const noexcept  { return this->begin() + this->length(); }
             constexpr std::string_view to_string_view(this auto&& self) noexcept { return std::string_view(self.begin(), self.length()); }
             constexpr std::string to_string(this auto&& self) noexcept { return std::string(self.begin(), self.length()); }
+            
+            constexpr bool operator==(this auto&& self, const constant_string& arg) noexcept
+            {
+                for
+                    (
+                        T* l_begin{self.begin()}, * r_begin{arg.begin()};
+                        l_begin < self.end();
+                        ++l_begin, ++r_begin
+                    )
+                {
+                    if (*l_begin != *r_begin)
+                    { return false; }
+                }
+                return true;
+            }
+
+            template <typename Ty, size_t Size>
+                requires (Size <= N)
+            constexpr bool operator==(this auto&& self, const Ty (&arg)[Size]) noexcept
+            {
+                for (T* l_begin{self.begin()}; auto& elem : arg)
+                {
+                    if (*l_begin != elem)
+                    { return false; }
+                }
+                return true;
+            }
+            
+            template <typename Ty>
+            constexpr bool operator!=(this auto&& self, const Ty& arg) noexcept
+            { return !self.operator==(arg); }
     };
 
     template <constant_string_detail::CStrReq T>

@@ -1,139 +1,116 @@
 #pragma once
 
-#include <bit>
-#include <algorithm>
-
-#include "SIA/internals/types.hpp"
-#include "SIA/utility/tools.hpp"
-#include "SIA/utility/type_container.hpp"
 #include "SIA/utility/type/constant_string.hpp"
+#include "SIA/utility/type_index.hpp"
 
 namespace sia
 {
-    template <size_t BytePos, typename Type, constant_string Name>
-    struct layout;
+    template <typename Type, constant_string Name, size_t BytePos>
+    struct layout
+    {
+        template <typename Ty>
+            requires (std::is_same_v<Ty, Type>)
+        static constexpr Type* map(byte_t* base) noexcept
+        { return type_cast<Type*>(base + BytePos); }
+        template <typename Ty>
+            requires (std::is_same_v<Ty, Type>)
+        static constexpr const Type* map(const byte_t* base) noexcept
+        { return type_cast<const Type*>(base + BytePos); }
+
+        template <constant_string TargetName>
+            requires (TargetName == Name)
+        static constexpr Type* map(byte_t* base) noexcept
+        { return type_cast<Type*>(base + BytePos); }
+        template <constant_string TargetName>
+            requires (TargetName == Name)
+        static constexpr const Type* map(const byte_t* base) noexcept
+        { return type_cast<const Type*>(base + BytePos); }
+
+        static constexpr Type* get(byte_t* base) noexcept
+        { return type_cast<Type*>(base + BytePos); }
+        static constexpr const Type* get(const byte_t* base) noexcept
+        { return type_cast<const Type*>(base + BytePos); }
+
+        static constexpr size_t require_size() noexcept { return sizeof(Type) + BytePos; }
+    };
 
     namespace frame_detail
     {
-        constexpr auto select_impl = [] <constant_string Str, typename TypeCon, size_t Pos> (std::pair<bool, size_t>& arg) constexpr noexcept -> auto
-        {
-            using pos_t = TypeCon::template at_t<Pos>;
-            constexpr pos_t obj { };
-            if (obj.name().to_string_view().compare(Str.to_string_view()) == 0)
-            {
-                arg.first = true;
-                arg.second = Pos;
-            }
-        };
-        constexpr auto select = [] <constant_string Str, typename TypeCon, size_t... Seqs> (std::index_sequence<Seqs...> seq) constexpr noexcept -> auto
-        {
-            std::pair<bool, size_t> ret{ };
-            (select_impl.template operator()<Str, TypeCon, Seqs>(ret), ...);
-            return ret;
-        };
-        constexpr auto select_wrap = [] <constant_string Str, typename TypeCon, size_t... Seqs> (std::index_sequence<Seqs...> arg) constexpr noexcept -> size_t
-        {
-            constexpr auto result = select.operator()<Str, TypeCon>(arg);
-            static_assert(result.first, "error : request non exist object name.");
-            return result.second;
-        };
+        template <typename T>
+        struct is_layout_type : std::bool_constant<false> { };
+        template <typename T, constant_string Name, size_t BytePos>
+        struct is_layout_type<layout<T, Name, BytePos>> : std::bool_constant<true> { };
+    
+        SIA_MACRO_GEN_OVERLOAD(map_overload, map)
 
         template <typename T>
-        struct LayoutType { static constexpr bool value = false; };
-        template <size_t BytePos, typename Type, constant_string Name>
-        struct LayoutType<layout<BytePos, Type, Name>> { static constexpr bool value = true; };
-        template <typename T>
-        constexpr bool LayoutType_v = LayoutType<T>::value;
-
+        constexpr void calc_requires_size_impl(size_t& arg) noexcept
+        {
+            if (arg < T::require_size())
+            { arg = T::require_size(); }
+        }
+    
         template <typename... Ts>
-        consteval size_t proc_get_layout_max_size() noexcept
+        constexpr size_t calc_requires_size() noexcept
         {
             size_t ret { };
-            constexpr auto max = [] (size_t& arg, const size_t in) constexpr noexcept -> void { if(arg < in) { arg = in; } };
-            (max(ret, Ts().req_size()), ...);
+            (calc_requires_size_impl<Ts>(ret), ...);
             return ret;
         }
-
-        template <size_t ByteSize, typename... Ts>
-        struct frame_impl : public chunk<byte_t, ByteSize>
-        {
-        private:
-            using self_t = frame_impl;
-            using tcon_t = type_container<Ts...>;
-            using base_t = chunk<byte_t, ByteSize>;
-            using seq_t = std::make_index_sequence<sizeof...(Ts)>;
-            
-        public:
-            template <size_t Nth>
-            constexpr auto ptr() noexcept
-            {
-                using pos_t = tcon_t::template at_t<Nth>;
-                constexpr pos_t obj { };
-                return type_cast<typename pos_t::type*>(this->base_t::ptr(obj.pos()));
-            }
-            template <size_t Nth>
-            constexpr const auto ptr() const noexcept
-            {
-                using pos_t = tcon_t::template at_t<Nth>;
-                constexpr pos_t obj { };
-                return type_cast<const typename pos_t::type*>(this->base_t::ptr(obj.pos()));
-            }
-            template <constant_string CStr>
-            constexpr auto ptr() noexcept
-            { return this->self_t::template ptr<select_wrap.operator()<CStr, tcon_t>(seq_t())>(); }
-            template <constant_string CStr>
-            constexpr const auto ptr() const noexcept
-            { return this->self_t::template ptr<select_wrap.operator()<CStr, tcon_t>(seq_t())>(); }
-
-            template <size_t Nth>
-            constexpr auto& ref() noexcept { return *(this->self_t::template ptr<Nth>()); }
-            template <size_t Nth>
-            constexpr const auto& ref() const noexcept { return *(this->self_t::template ptr<Nth>()); }
-            template <constant_string CStr>
-            constexpr auto& ref() noexcept
-            { return this->self_t::template ref<select_wrap.operator()<CStr, tcon_t>(seq_t())>(); }
-            template <constant_string CStr>
-            constexpr const auto& ref() const noexcept
-            { return this->self_t::template ref<select_wrap.operator()<CStr, tcon_t>(seq_t())>(); }
-
-            constexpr byte_t* begin() noexcept { return this->base_t::ptr(); }
-            constexpr const byte_t* begin() const noexcept { return this->base_t::ptr(); }
-            constexpr byte_t* end() noexcept { return this->base_t::ptr(ByteSize); }
-            constexpr const byte_t* end() const noexcept { return this->base_t::ptr(ByteSize); }
-        };
     } // namespace frame_detail
+    
 
-    template <size_t BytePos, typename Type, constant_string Name = "">
-    struct layout
-    {
-        using type = Type;
-        constexpr auto name(this auto&& self) noexcept { return Name; }
-        constexpr size_t pos(this auto&& self) noexcept { return BytePos; }
-        constexpr size_t type_size(this auto&& self) noexcept { return sizeof(type); }
-        constexpr size_t req_size(this auto&& self) noexcept { return self.pos() + self.type_size(); }
-    };
-    template <size_t Pos, typename Type, constant_string Name = "">
-    using layout_t = layout<Pos, Type, Name>;
 
     template <typename... Ts>
-        requires (frame_detail::LayoutType_v<Ts> && ...)
-    struct frame : public frame_detail::frame_impl<frame_detail::proc_get_layout_max_size<Ts...>(), Ts...>
+        requires (frame_detail::is_layout_type<Ts>::value && ...)
+    struct frame : public chunk<byte_t, frame_detail::calc_requires_size<Ts...>()>
     {
-    // private:
-    //     using base_t = frame_detail::frame_impl<frame_detail::proc_get_layout_max_size<Ts...>(), Ts...>;
-    // public:
-    //     template <size_t N, size_t... Seqs>
-    //         requires (N <= frame_detail::proc_get_layout_max_size<Ts...>())
-    //     constexpr void assign(const byte_t (&arr)[N]) noexcept
-    //     {
-    //         if (this->base_t::begin() != static_cast<const byte_t*>(arr))
-    //         { std::ranges::copy_n(static_cast<const byte_t*>(arr), N, this->base_t::begin()); }
-    //     }
+        private:
+            using base_t = chunk<byte_t, frame_detail::calc_requires_size<Ts...>()>;
+            using type_index_t = type_index<Ts...>;
+            static constexpr const auto mapper =  frame_detail::map_overload { Ts{ }... };
+            
+        public:
+            template <typename TargetType>
+            constexpr auto* ptr() noexcept
+            { return mapper.map<TargetType>(this->base_t::ptr()); }
+            template <typename TargetType>
+            constexpr const auto* ptr() const noexcept
+            { return mapper.map<TargetType>(this->base_t::ptr()); }
 
-    //     constexpr void assign(const byte_t* ptr, size_t size) noexcept
-    //     {
-    //         if (ptr != this->base_t::begin())
-    //         { std::ranges::copy_n(ptr, size, this->base_t::begin()); }
-    //     }
+            template <constant_string TargetString>
+            constexpr auto* ptr() noexcept
+            { return mapper.map<TargetString>(this->base_t::ptr()); }
+            template <constant_string TargetString>
+            constexpr const auto* ptr() const noexcept
+            { return mapper.map<TargetString>(this->base_t::ptr()); }
+
+            template <size_t N>
+            constexpr auto* ptr() noexcept
+            { return type_index_t::at<N>::get(this->base_t::ptr()); }
+            template <size_t N>
+            constexpr const auto* ptr() const noexcept
+            { return type_index_t::at<N>::get(this->base_t::ptr()); }
+
+            template <typename TargetType>
+            constexpr auto& ref() noexcept
+            { return *this->ptr<TargetType>(); }
+            template <typename TargetType>
+            constexpr const auto& ref() const noexcept
+            { return *this->ptr<TargetType>(); }
+
+            template <constant_string TargetString>
+            constexpr auto& ref() noexcept
+            { return *this->ptr<TargetString>(); }
+            template <constant_string TargetString>
+            constexpr const auto& ref() const noexcept
+            { return *this->ptr<TargetString>(); }
+
+            template <size_t N>
+            constexpr auto& ref() noexcept
+            { return *this->ptr<N>(); }
+            template <size_t N>
+            constexpr const auto& ref() const noexcept
+            { return *this->ptr<N>(); }
     };
 } // namespace sia

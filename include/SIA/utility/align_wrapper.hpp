@@ -29,7 +29,7 @@ namespace sia
     } // namespace align_wrapper_detail
     
     template <typename T, size_t Align = sizeof(T)>
-    struct align_wrapper : public chunk<byte_t, align_wrapper_detail::get_require_space<T, Align>()>
+    struct align_wrapper : private chunk<byte_t, align_wrapper_detail::get_require_space<T, Align>()>
     {
         private:
             using base_t = chunk<byte_t, align_wrapper_detail::get_require_space<T, Align>()>;
@@ -85,10 +85,11 @@ namespace sia
                 return *this;
             }
 
-            constexpr       T* ptr()        noexcept { return type_cast<T*>(this->base_t::ptr()); }
-            constexpr const T* ptr() const  noexcept { return type_cast<const T*>(this->base_t::ptr()); }
-            constexpr       T& ref()        noexcept { return *(this->self_t::ptr()); }
-            constexpr const T& ref() const  noexcept { return *(this->self_t::ptr()); }
+            constexpr       T* ptr()       noexcept { return type_cast<T*>(this->base_t::ptr()); }
+            constexpr const T* ptr() const noexcept { return type_cast<const T*>(this->base_t::ptr()); }
+            constexpr       T& ref()       noexcept { return *(this->self_t::ptr()); }
+            constexpr const T& ref() const noexcept { return *(this->self_t::ptr()); }
+            
             constexpr T* operator->() noexcept { return this->self_t::ptr(); }
             constexpr const T* operator->() const noexcept { return this->self_t::ptr(); }
     };
