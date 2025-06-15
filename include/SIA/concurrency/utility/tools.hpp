@@ -5,8 +5,11 @@
 
 #include <functional>
 
+// #include "SIA/concurrency/internals/define.hpp"
+
+#include "SIA/utility/tools.hpp"
 #include "SIA/utility/recorder.hpp"
-#include "SIA/concurrency/internals/define.hpp"
+#include "SIA/utility/type/function_pointer.hpp"
 
 
 namespace sia
@@ -15,8 +18,8 @@ namespace sia
     {
         namespace basis
         {
-            constexpr default_time_rep_t empty_loop_val = 0;
-            constexpr default_time_rep_t empty_wait_val = 0;
+            constexpr const default_time_rep_t empty_loop_val = 0;
+            constexpr const default_time_rep_t empty_wait_val = 0;
         } // namespace tools
     } // namespace stamps
     
@@ -56,20 +59,30 @@ namespace sia
 
     namespace tools_detail
     {
-        template <tags::wait WaitTag , typename Func, typename... Ts, typename CompType, typename WaitTimeType = default_time_rep_t>
-        constexpr bool busy_loop_impl(CompType&& loop_out_cond, WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
+        template <tags::wait WaitTag , typename FpType, typename... Ts, typename CompType, typename WaitTimeType = default_time_rep_t>
+        constexpr bool busy_loop_impl(CompType&& loop_out_cond, WaitTimeType wt_v, FpType fp, Ts&&... args)
+            noexcept
+            (
+                tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() &&
+                function_info_t<FpType>::nothrow_flag
+            )
         {
-            while (loop_out_cond != std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
+            while (loop_out_cond != std::invoke(fp, std::forward<Ts>(args)...))
             { wait<WaitTag>(wt_v); }
             return true;
         }
 
-        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename WaitTimeType = default_time_rep_t>
-        constexpr bool n_loop_impl(CompType&& loop_out_cond, size_t n , WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
+        template <tags::wait WaitTag, typename FpType, typename... Ts, typename CompType, typename WaitTimeType = default_time_rep_t>
+        constexpr bool n_loop_impl(CompType&& loop_out_cond, size_t n , WaitTimeType wt_v, FpType fp, Ts&&... args)
+            noexcept
+            (
+                tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() &&
+                function_info_t<FpType>::nothrow_flag
+            )
         {
             for (size_t count { }; count < n; ++count)
             {
-                if (loop_out_cond == std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
+                if (loop_out_cond == std::invoke(fp, std::forward<Ts>(args)...))
                 { return true;}
                 else
                 { wait<WaitTag>(wt_v); }
@@ -77,14 +90,19 @@ namespace sia
             return false;
         }
 
-        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename Ratio, typename Rep = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
-        constexpr bool for_loop_impl(CompType&& loop_out_cond, std::chrono::duration<Rep, Ratio> time, WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
+        template <tags::wait WaitTag, typename FpType, typename... Ts, typename CompType, typename Ratio, typename Rep = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
+        constexpr bool for_loop_impl(CompType&& loop_out_cond, std::chrono::duration<Rep, Ratio> time, WaitTimeType wt_v, FpType fp, Ts&&... args)
+            noexcept
+            (
+                tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() &&
+                function_info_t<FpType>::nothrow_flag
+            )
         {
             single_recorder sr { };
             sr.set();
             do
             {
-                if (loop_out_cond == std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
+                if (loop_out_cond == std::invoke(fp, std::forward<Ts>(args)...))
                 { return true;}
                 else
                 {
@@ -96,12 +114,17 @@ namespace sia
             return false;
         }
 
-        template <tags::wait WaitTag, typename Func, typename... Ts, typename CompType, typename Clock, typename Duration, typename WaitTimeType = default_time_rep_t>
-        constexpr bool until_loop_impl(CompType&& loop_out_cond, std::chrono::time_point<Clock, Duration> tp, WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
+        template <tags::wait WaitTag, typename FpType, typename... Ts, typename CompType, typename Clock, typename Duration, typename WaitTimeType = default_time_rep_t>
+        constexpr bool until_loop_impl(CompType&& loop_out_cond, std::chrono::time_point<Clock, Duration> tp, WaitTimeType wt_v, FpType fp, Ts&&... args)
+            noexcept
+            (
+                tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() &&
+                function_info_t<FpType>::nothrow_flag
+            )
         {
             do
             {
-                if (loop_out_cond == std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...))
+                if (loop_out_cond == std::invoke(fp, std::forward<Ts>(args)...))
                 { return true;}
                 else
                 { wait<WaitTag>(wt_v); }
@@ -111,18 +134,23 @@ namespace sia
         }
     } // namespace tools_detail
 
-    template <tags::loop LoopTag, tags::wait WaitTag = tags::wait::busy, typename Func, typename... Ts, typename CompType, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
-        requires (std::is_invocable_v<Func, Ts...>)
-    constexpr bool loop(CompType&& loop_out_cond, LoopTimeType lt_v, WaitTimeType wt_v, Func&& func, Ts&&... args) noexcept(tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() && noexcept(std::invoke(std::forward<Func>(func), std::forward<Ts>(args)...)))
+    template <tags::loop LoopTag, tags::wait WaitTag = tags::wait::busy, typename FpType, typename... Ts, typename CompType, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
+        requires (std::is_invocable_v<FpType, Ts...> && std::is_pointer_v<FpType>)
+    constexpr bool loop(CompType&& loop_out_cond, LoopTimeType lt_v, WaitTimeType wt_v, FpType fp, Ts&&... args)
+        noexcept
+        (
+            tools_detail::is_wait_nothrow<WaitTag, WaitTimeType>() &&
+            function_info_t<FpType>::nothrow_flag
+        )
     {
         if constexpr (LoopTag == tags::loop::busy)
-        { return tools_detail::busy_loop_impl<WaitTag>(std::forward<CompType>(loop_out_cond), wt_v, std::forward<Func>(func), std::forward<Ts>(args)...); }
+        { return tools_detail::busy_loop_impl<WaitTag>(std::forward<CompType>(loop_out_cond), wt_v, fp, std::forward<Ts>(args)...); }
         else if constexpr (LoopTag == tags::loop::repeat_n)
-        { return tools_detail::n_loop_impl<WaitTag>(std::forward<CompType>(loop_out_cond), lt_v, wt_v, std::forward<Func>(func), std::forward<Ts>(args)...); }
+        { return tools_detail::n_loop_impl<WaitTag>(std::forward<CompType>(loop_out_cond), lt_v, wt_v, fp, std::forward<Ts>(args)...); }
         else if constexpr (LoopTag == tags::loop::repeat_for)
-        { return tools_detail::for_loop_impl<WaitTag>(std::forward<CompType>(loop_out_cond), lt_v, wt_v, std::forward<Func>(func), std::forward<Ts>(args)...); }
+        { return tools_detail::for_loop_impl<WaitTag>(std::forward<CompType>(loop_out_cond), lt_v, wt_v, fp, std::forward<Ts>(args)...); }
         else if constexpr (LoopTag == tags::loop::repeat_until)
-        { return tools_detail::until_loop_impl<WaitTag>(std::forward<CompType>(loop_out_cond), lt_v, wt_v, std::forward<Func>(func), std::forward<Ts>(args)...); }
+        { return tools_detail::until_loop_impl<WaitTag>(std::forward<CompType>(loop_out_cond), lt_v, wt_v, fp, std::forward<Ts>(args)...); }
         else
         { return false; }
     }

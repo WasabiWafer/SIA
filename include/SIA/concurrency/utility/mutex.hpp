@@ -23,6 +23,7 @@ namespace sia
         public:
             constexpr mutex() noexcept : m_owner()
             { static_assert(atomic_t::is_always_lock_free); }
+            
             constexpr mutex(const mutex&) noexcept = delete;
             constexpr mutex& operator=(const mutex&) noexcept = delete;
             constexpr mutex(mutex&&) noexcept = delete;

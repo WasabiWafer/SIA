@@ -50,19 +50,33 @@ namespace sia
     //     constexpr const bool is_nothrow_member_function_v = is_nothrow_member_function<Class, Func, Args...>::value;
     // } // namespace tools_detail
     
-    template <auto Func, typename... Args>
+    // template <auto Func, typename... Args>
+    // struct is_nothrow_function;
+
+    // template <auto Func, typename... Args>
+    //     requires (std::is_pointer_v<decltype(Func)> && std::is_function_v<std::remove_pointer_t<decltype(Func)>>)
+    // struct is_nothrow_function<Func, Args...> : std::bool_constant<requires() { {Func(Args{ }...)} noexcept; }> { };
+
+    // template <auto Func, typename Class, typename... Args>
+    //     requires (std::is_member_function_pointer_v<decltype(Func)>)
+    // struct is_nothrow_function<Func, Class, Args...> : std::bool_constant<requires(Class c) { {(c.*Func)(Args{ }...)} noexcept; }> { };
+    
+    // template <auto Func, typename... Args>
+    // constexpr const bool is_nothrow_function_v = is_nothrow_function<Func, Args...>::value;
+
+    template <typename FuncType, typename... Args>
     struct is_nothrow_function;
 
-    template <auto Func, typename... Args>
-        requires (std::is_pointer_v<decltype(Func)> && std::is_function_v<std::remove_pointer_t<decltype(Func)>>)
-    struct is_nothrow_function<Func, Args...> : std::bool_constant<requires() { {Func(Args{ }...)} noexcept; }> { };
+    template <typename FpType, typename... Args>
+        requires (std::is_pointer_v<FpType> && std::is_function_v<std::remove_pointer_t<FpType>>)
+    struct is_nothrow_function<FpType, Args...> : std::bool_constant<requires(FpType fp) { { fp(Args{ }...) } noexcept; }> { };
 
-    template <auto Func, typename Class, typename... Args>
-        requires (std::is_member_function_pointer_v<decltype(Func)>)
-    struct is_nothrow_function<Func, Class, Args...> : std::bool_constant<requires(Class c) { {(c.*Func)(Args{ }...)} noexcept; }> { };
+    template <typename FpType, typename Class, typename... Args>
+        requires (std::is_member_function_pointer_v<FpType>)
+    struct is_nothrow_function<FpType, Class, Args...> : std::bool_constant<requires(Class c, FpType fp) { {(c.*fp)(Args{ }...)} noexcept; }> { };
     
-    template <auto Func, typename... Args>
-    constexpr const bool is_nothrow_function_v = is_nothrow_function<Func, Args...>::value;
+    template <typename FpType, typename... Args>
+    constexpr const bool is_nothrow_function_v = is_nothrow_function<FpType, Args...>::value;
 
     template <auto E>
     struct entity

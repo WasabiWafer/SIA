@@ -68,49 +68,49 @@ namespace sia
         private:
             using base_t = chunk<byte_t, frame_detail::calc_requires_size<Ts...>()>;
             using type_index_t = type_index<Ts...>;
-            static constexpr const auto mapper =  frame_detail::map_overload { Ts{ }... };
-            
+            static constexpr const auto mapper = frame_detail::map_overload { Ts{ }... };
+
         public:
             template <typename TargetType>
-            constexpr auto* ptr() noexcept
+            constexpr auto*         ptr()       noexcept
             { return mapper.map<TargetType>(this->base_t::ptr()); }
             template <typename TargetType>
-            constexpr const auto* ptr() const noexcept
+            constexpr const auto*   ptr() const noexcept
             { return mapper.map<TargetType>(this->base_t::ptr()); }
 
             template <constant_string TargetString>
-            constexpr auto* ptr() noexcept
+            constexpr auto*         ptr()       noexcept
             { return mapper.map<TargetString>(this->base_t::ptr()); }
             template <constant_string TargetString>
-            constexpr const auto* ptr() const noexcept
+            constexpr const auto*   ptr() const noexcept
             { return mapper.map<TargetString>(this->base_t::ptr()); }
 
             template <size_t N>
-            constexpr auto* ptr() noexcept
+            constexpr auto*         ptr()       noexcept
             { return type_index_t::at<N>::get(this->base_t::ptr()); }
             template <size_t N>
-            constexpr const auto* ptr() const noexcept
+            constexpr const auto*   ptr() const noexcept
             { return type_index_t::at<N>::get(this->base_t::ptr()); }
 
             template <typename TargetType>
-            constexpr auto& ref() noexcept
+            constexpr auto&         ref()       noexcept
             { return *this->ptr<TargetType>(); }
             template <typename TargetType>
-            constexpr const auto& ref() const noexcept
+            constexpr const auto&   ref() const noexcept
             { return *this->ptr<TargetType>(); }
 
             template <constant_string TargetString>
-            constexpr auto& ref() noexcept
+            constexpr auto&         ref()       noexcept
             { return *this->ptr<TargetString>(); }
             template <constant_string TargetString>
-            constexpr const auto& ref() const noexcept
+            constexpr const auto&   ref() const noexcept
             { return *this->ptr<TargetString>(); }
 
             template <size_t N>
-            constexpr auto& ref() noexcept
+            constexpr auto&         ref()       noexcept
             { return *this->ptr<N>(); }
             template <size_t N>
-            constexpr const auto& ref() const noexcept
+            constexpr const auto&   ref() const noexcept
             { return *this->ptr<N>(); }
     };
 } // namespace sia

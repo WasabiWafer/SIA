@@ -15,47 +15,52 @@ namespace sia
     template <typename ValueType = largest_unsigned_integer_t, ValueType Limit = std::numeric_limits<ValueType>::max()>
     struct semaphore
     {
-    private:
-        using self_t = semaphore;
-        using value_t = ValueType;
-        using atomic_t = std::atomic<value_t>;
+        private:
+            using self_t = semaphore;
+            using value_t = ValueType;
+            using atomic_t = std::atomic<value_t>;
 
-        atomic_t m_count;
+            atomic_t m_count;
 
-        constexpr value_t num_step(this auto&& self) noexcept { return value_t(1); }
+            static constexpr value_t num_step() noexcept { return value_t(1); }
 
-    public:
-        constexpr semaphore(value_t init = Limit) noexcept
-            : m_count(init)
-        { assertm(this->m_count.is_always_lock_free, ""); }
+        public:
+            constexpr semaphore(value_t init = Limit) noexcept
+                : m_count(init)
+            { static_assert(atomic_t::is_always_lock_free); }
 
-        constexpr bool try_acquire() noexcept
-        {
-            constexpr auto acq = stamps::memory_orders::acquire_v;
-            constexpr auto rle = stamps::memory_orders::release_v;
-            value_t cur = this->m_count.load(acq);
-            if (cur != 0)
+            semaphore(const semaphore&) = delete;
+            semaphore(semaphore&&) = delete;
+            semaphore& operator=(const semaphore&) = delete
+            semaphore& operator=(semaphore&&) = delete;
+
+            constexpr bool try_acquire() noexcept
             {
-                while (!this->m_count.compare_exchange_weak(cur, cur - this->num_step(), rle, acq))
+                constexpr auto acq = stamps::memory_orders::acquire_v;
+                constexpr auto rle = stamps::memory_orders::release_v;
+
+                value_t cur = this->m_count.load(acq);
+                if (cur != 0)
                 {
-                    if (cur == 0)
-                    { return false; }
+                    while (!this->m_count.compare_exchange_weak(cur, cur - this->num_step(), rle, acq))
+                    {
+                        if (cur == 0)
+                        { return false; }
+                    }
+                    return true;
                 }
-                return true;
+                else
+                { return false; }
             }
-            else
-            { return false; }
-        }
 
-        template <tags::loop LoopTag = tags::loop::busy, tags::wait WaitTag = tags::wait::busy, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
-        constexpr bool try_acquire_loop(LoopTimeType ltt_v = stamps::basis::empty_loop_val, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
-        { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, static_cast<bool(self_t::*)()>(&self_t::try_acquire), this); }
+            template <tags::loop LoopTag = tags::loop::busy, tags::wait WaitTag = tags::wait::busy, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
+            constexpr bool try_acquire_loop(LoopTimeType ltt_v = stamps::basis::empty_loop_val, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
+            { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, static_cast<bool(semaphore::*)()>(&semaphore::try_acquire), this); }
 
-        template <tags::wait WaitTag = tags::wait::busy, typename WaitTimeType = default_time_rep_t>
-        constexpr void acquire(WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
-        { try_acquire_loop<tags::loop::busy, WaitTag>(stamps::basis::empty_loop_val, wtt_v); }
+            constexpr void acquire() noexcept
+            { try_acquire_loop<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val); }
 
-        constexpr void release() noexcept
-        { this->m_count.fetch_add(this->num_step(), stamps::memory_orders::relaxed_v); }
+            constexpr void release() noexcept
+            { this->m_count.fetch_add(this->num_step(), stamps::memory_orders::relaxed_v); }
     };
 } // namespace sia

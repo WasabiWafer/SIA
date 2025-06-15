@@ -209,9 +209,13 @@ namespace sia
         requires (std::is_pointer_v<FuncPtrType> && std::is_function_v<std::remove_pointer_t<FuncPtrType>>)
     struct function_pointer<FuncPtrType, type_list<ArgTypes...>>
     {
+        using info_t = function_info_t<FuncPtrType>;
         FuncPtrType m_fp;
 
-        constexpr function_info_t<FuncPtrType>::return_t operator()(ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+        // constexpr function_pointer() noexcept = default;
+        // constexpr function_pointer(FuncPtrType fp) noexcept : m_fp { fp } { }
+
+        constexpr info_t::return_t operator()(ArgTypes... args) noexcept(info_t::nothrow_flag)
         { return m_fp(std::forward<ArgTypes>(args)...); }
     };
 
@@ -220,76 +224,77 @@ namespace sia
         requires (std::is_member_function_pointer_v<FuncPtrType>)
     struct function_pointer<FuncPtrType, type_list<ArgTypes...>>
     {
+        using info_t = function_info_t<FuncPtrType>;
         FuncPtrType m_fp;
+        
+        // constexpr function_pointer() noexcept = default;
+        // constexpr function_pointer(FuncPtrType fp) noexcept : m_fp { fp } { }
 
         // member function begin
             // no_ref
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::none) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::none))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(function_info_t<FuncPtrType>::class_t* obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::none) && (info_t::this_reference_category_tag == tags::reference_category::none))
+            constexpr info_t::return_t operator()(info_t::class_t* obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj->*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::const_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::none))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(const function_info_t<FuncPtrType>::class_t* obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::const_type) && (info_t::this_reference_category_tag == tags::reference_category::none))
+            constexpr info_t::return_t operator()(const info_t::class_t* obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj->*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::volatile_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::none))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(volatile function_info_t<FuncPtrType>::class_t* obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::volatile_type) && (info_t::this_reference_category_tag == tags::reference_category::none))
+            constexpr info_t::return_t operator()(volatile info_t::class_t* obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj->*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::const_volatile_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::none))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(const volatile function_info_t<FuncPtrType>::class_t* obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::const_volatile_type) && (info_t::this_reference_category_tag == tags::reference_category::none))
+            constexpr info_t::return_t operator()(const volatile info_t::class_t* obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj->*m_fp)(std::forward<ArgTypes>(args)...); }
 
             // lv_ref
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::none) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::lvalue))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(function_info_t<FuncPtrType>::class_t& obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::none) && (info_t::this_reference_category_tag == tags::reference_category::lvalue))
+            constexpr info_t::return_t operator()(info_t::class_t& obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj.*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::const_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::lvalue))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(const function_info_t<FuncPtrType>::class_t& obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::const_type) && (info_t::this_reference_category_tag == tags::reference_category::lvalue))
+            constexpr info_t::return_t operator()(const info_t::class_t& obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj.*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::volatile_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::lvalue))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(volatile function_info_t<FuncPtrType>::class_t& obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::volatile_type) && (info_t::this_reference_category_tag == tags::reference_category::lvalue))
+            constexpr info_t::return_t operator()(volatile info_t::class_t& obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj.*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::const_volatile_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::lvalue))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(const volatile function_info_t<FuncPtrType>::class_t& obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::const_volatile_type) && (info_t::this_reference_category_tag == tags::reference_category::lvalue))
+            constexpr info_t::return_t operator()(const volatile info_t::class_t& obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj.*m_fp)(std::forward<ArgTypes>(args)...); }
 
             // rv_ref
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::none) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::lvalue))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(function_info_t<FuncPtrType>::class_t&& obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::none) && (info_t::this_reference_category_tag == tags::reference_category::lvalue))
+            constexpr info_t::return_t operator()(info_t::class_t&& obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj.*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::const_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::lvalue))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(const function_info_t<FuncPtrType>::class_t&& obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::const_type) && (info_t::this_reference_category_tag == tags::reference_category::lvalue))
+            constexpr info_t::return_t operator()(const info_t::class_t&& obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj.*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::volatile_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::lvalue))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(volatile function_info_t<FuncPtrType>::class_t&& obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::volatile_type) && (info_t::this_reference_category_tag == tags::reference_category::lvalue))
+            constexpr info_t::return_t operator()(volatile info_t::class_t&& obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj.*m_fp)(std::forward<ArgTypes>(args)...); }
 
             template <typename T = void>
-                requires ((function_info_t<FuncPtrType>::this_qualifier_tag == tags::type_qualifier::const_volatile_type) && (function_info_t<FuncPtrType>::this_reference_category_tag == tags::reference_category::lvalue))
-            constexpr function_info_t<FuncPtrType>::return_t operator()(const volatile function_info_t<FuncPtrType>::class_t&& obj, ArgTypes... args) noexcept(function_info_t<FuncPtrType>::nothrow_flag)
+                requires ((info_t::this_qualifier_tag == tags::type_qualifier::const_volatile_type) && (info_t::this_reference_category_tag == tags::reference_category::lvalue))
+            constexpr info_t::return_t operator()(const volatile info_t::class_t&& obj, ArgTypes... args) noexcept(info_t::nothrow_flag)
             { return (obj.*m_fp)(std::forward<ArgTypes>(args)...); }
         // member function end
     };
-
-    // template <auto FuncPtr>
-    // constexpr const bool is_nothrow_function_v = function_info_t<decltype(FuncPtr)>::nothrow_flag;
 
     template <typename FuncPtrType>
         requires ((std::is_pointer_v<FuncPtrType> && std::is_function_v<std::remove_pointer_t<FuncPtrType>>) || std::is_member_function_pointer_v<FuncPtrType>)
