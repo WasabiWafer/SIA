@@ -3,6 +3,7 @@
 // #pragma comment(lib, "Kernel32")
 // #include <Windows.h>
 
+#include <thread>
 #include <functional>
 
 // #include "SIA/concurrency/internals/define.hpp"
@@ -14,6 +15,12 @@
 
 namespace sia
 {
+    namespace tags
+    {
+        enum class wait { busy, yield, sleep_for, sleep_until };
+        enum class loop { busy, repeat_n, repeat_for, repeat_until };
+    } // namespace tags
+
     namespace stamps
     {
         namespace basis
@@ -135,7 +142,7 @@ namespace sia
     } // namespace tools_detail
 
     template <tags::loop LoopTag, tags::wait WaitTag = tags::wait::busy, typename FpType, typename... Ts, typename CompType, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
-        requires (std::is_invocable_v<FpType, Ts...> && std::is_pointer_v<FpType>)
+        requires (std::is_invocable_v<FpType, Ts...>)
     constexpr bool loop(CompType&& loop_out_cond, LoopTimeType lt_v, WaitTimeType wt_v, FpType fp, Ts&&... args)
         noexcept
         (
