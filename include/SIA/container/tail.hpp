@@ -16,9 +16,12 @@ namespace sia
             T* m_data;
 
             constexpr tail_node* next() noexcept { return m_node; }
+            constexpr const tail_node* next() const noexcept { return m_node; }
             constexpr T* ptr() noexcept { return m_data; }
+            constexpr const T* ptr() const noexcept { return m_data; }
             constexpr T& ref() noexcept { return *m_data; }
-            // constexpr void set_data(T* new_ptr) noexcept { m_data = new_ptr; }
+            constexpr const T& ref() const noexcept { return *m_data; }
+            constexpr void set_data(T* new_ptr) noexcept { m_data = new_ptr; }
             constexpr void set_node(tail_node* new_ptr) noexcept { m_node = new_ptr; }
             template <typename Allocator>
             constexpr void destroy_data(Allocator&& alloc) noexcept(std::is_nothrow_destructible_v<T>)
@@ -36,12 +39,23 @@ namespace sia
                 node_t* m_stock;
 
             public:
+                constexpr tail_stock() noexcept = default;
                 constexpr tail_stock(node_t* arg) noexcept
                     : m_stock{arg}
                 { }
 
                 constexpr bool is_empty() noexcept { return m_stock == nullptr; }
                 constexpr node_t* begin() noexcept { return m_stock; }
+                constexpr node_t* back() noexcept
+                {
+                    node_t* ret {begin()};
+                    if (ret != nullptr)
+                    {
+                        while (ret->next() != nullptr)
+                        { ret = ret->next(); }
+                    }
+                    return ret;
+                }
 
                 constexpr node_t* pull() noexcept
                 {
@@ -56,6 +70,17 @@ namespace sia
                     arg->set_node(m_stock);
                     m_stock = arg;
                 }
+
+                constexpr void attach(node_t* arg) noexcept
+                {
+                    if (is_empty())
+                    { m_stock = arg; }
+                    else
+                    { back()->set_node(arg); }
+                }
+
+                constexpr void replace(node_t* arg) noexcept
+                { m_stock = arg; }
         };
 
         template <typename T>
@@ -68,6 +93,7 @@ namespace sia
                 tail_stock<T> m_stock;
 
                 constexpr node_t* next() noexcept { return m_head; }
+                constexpr const node_t* next() const noexcept { return m_head; }
                 constexpr void set_node(node_t* new_ptr) noexcept { m_head = new_ptr; }
         };
     } // namespace tail_detail
@@ -120,22 +146,58 @@ namespace sia
                 }
             }
 
+            constexpr void copy_node(const node_t* arg)
+            {
+                const node_t* target = arg;
+                if (target != nullptr)
+                {
+                    push_front(target->ref());
+                    target = target->next();
+                    for (node_t* at {get_composition().m_head}; target != nullptr; target = target->next(), at = at->next())
+                    { push_after(at, target->ref()); }
+                }
+            }
+
         public:
             constexpr tail(const allocator_type& alloc = allocator_type{ }) noexcept 
                 : m_compair(splits::one_v, alloc, nullptr, nullptr)
             { }
 
-            // constexpr tail(const tail& arg, const allocator_type& alloc = allocator_type{ })
-            //     : m_compair(splits::one_v, alloc, nullptr, nullptr)
-            // {
-                
-            // }
+            constexpr tail(const tail& arg, const allocator_type& alloc = allocator_type{ })
+                : m_compair(splits::one_v, alloc, nullptr, nullptr)
+            { copy_node(arg.begin()); }
+
+            constexpr tail(tail&& arg, const allocator_type& alloc = allocator_type{ })
+                : m_compair(splits::one_v, alloc, arg.get_composition().m_head, arg.get_composition().m_stock)
+            {
+                arg.get_composition().m_head = nullptr;
+                arg.get_composition().m_stock = nullptr;
+            }
 
             constexpr ~tail() noexcept(std::is_nothrow_destructible_v<T>)
             {
                 composition_t& comp = get_composition();
                 deallocate_node(comp.m_stock.begin());
                 deallocate_node(comp.m_head);
+            }
+
+            constexpr tail& operator=(const tail& arg)
+            {
+                clear();
+                copy_node(arg.begin());
+                return *this;
+            }
+
+            constexpr tail& operator=(tail&& arg) noexcept(std::is_nothrow_destructible_v<T>)
+            {
+                clear();
+                composition_t& comp {get_composition()};
+                composition_t& target_comp {arg.get_composition()};
+                comp.m_head = target_comp.m_head;
+                comp.m_stock.attach(target_comp.m_stock.begin());
+                target_comp.m_head = nullptr;
+                target_comp.m_stock.replace(nullptr);
+                return *this;
             }
 
             constexpr bool is_empty(this auto&& self) noexcept { return self.get_composition().m_head == nullptr; }
@@ -169,11 +231,10 @@ namespace sia
             template <typename NodeType>
             constexpr void pop_after(NodeType* at) noexcept(std::is_nothrow_destructible_v<T>)
             {
-                composition_t& comp {get_composition()};
                 node_t* target = at->next();
                 at->set_node(target->next());
                 target->destroy_data(get_allocator());
-                comp.m_stock.push(target);
+                get_composition().m_stock.push(target);
             }
 
             constexpr void pop_front() noexcept(std::is_nothrow_destructible_v<T>)
@@ -195,5 +256,23 @@ namespace sia
 
             constexpr value_type& front() noexcept { return get_composition().m_head->ref(); }
             constexpr const value_type& front() const noexcept { return get_composition().m_head->ref(); }
+
+            constexpr void clear() noexcept(std::is_nothrow_destructible_v<T>)
+            {
+                composition_t& comp = get_composition();
+                node_t* target = begin();
+                if (target != nullptr)
+                {
+                    while(target->next() != nullptr)
+                    {
+                        target->destroy_data(get_allocator());
+                        target = target->next();
+                    }
+                    target->destroy_data(get_allocator());
+                    target->set_node(comp.m_stock.begin());
+                    comp.m_stock.replace(comp.m_head);
+                    comp.m_head = nullptr;
+                }
+            }
     };
 } // namespace sia
