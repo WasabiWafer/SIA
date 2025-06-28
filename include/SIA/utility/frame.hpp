@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SIA/utility/type/constant_string.hpp"
+#include "SIA/utility/types/constant_string.hpp"
 #include "SIA/utility/type_index.hpp"
 
 namespace sia

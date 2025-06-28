@@ -88,6 +88,10 @@ namespace sia
 
     template <typename T>
     using type = T;
+    template <auto E>
+    using to_type = decltype(E);
+    template <typename T, auto... Es>
+    using to_entity = entity<T(Es...)>;
 
     template <typename... Ts>
     struct type_list { using type = type_list; };

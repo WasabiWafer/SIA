@@ -10,7 +10,7 @@
 
 #include "SIA/utility/tools.hpp"
 #include "SIA/utility/recorder.hpp"
-#include "SIA/utility/type/function_pointer.hpp"
+#include "SIA/utility/types/function_pointer.hpp"
 
 
 namespace sia
@@ -141,7 +141,7 @@ namespace sia
         }
     } // namespace tools_detail
 
-    template <tags::loop LoopTag, tags::wait WaitTag = tags::wait::busy, typename FpType, typename... Ts, typename CompType, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
+    template <tags::loop LoopTag, tags::wait WaitTag, typename FpType, typename... Ts, typename CompType, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
         requires (std::is_invocable_v<FpType, Ts...>)
     constexpr bool loop(CompType&& loop_out_cond, LoopTimeType lt_v, WaitTimeType wt_v, FpType fp, Ts&&... args)
         noexcept

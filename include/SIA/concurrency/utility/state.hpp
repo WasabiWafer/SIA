@@ -41,7 +41,7 @@ namespace sia
             void set(const T& arg) noexcept
             { m_state.store(arg, stamps::memory_orders::relaxed_v); }
 
-            bool compare_exchange(tags::object_state& expt, const T& desr) noexcept
+            bool compare_exchange(tags::object_state& expt, T desr) noexcept
             { return m_state.compare_exchange_weak(expt, desr, stamps::memory_orders::relaxed_v, stamps::memory_orders::relaxed_v); }
     };
 } // namespace sia
