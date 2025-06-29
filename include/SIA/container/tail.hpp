@@ -5,6 +5,9 @@
 #include "SIA/utility/compressed_pair.hpp"
 #include "SIA/memory/allocator_converter.hpp"
 
+// should seperate tail_stock functionality to allocator
+// this is meaningless
+
 namespace sia
 {
     namespace tail_detail
