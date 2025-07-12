@@ -197,7 +197,7 @@ namespace sia
             constexpr void pop_back() noexcept(std::is_nothrow_destructible_v<T>)
             {
                 composition_t& comp = get_composition();
-                comp.m_begin.dec();
+                comp.m_end.dec();
                 this->destruct_at(address(comp.m_end.offset()));
             }
 
@@ -211,7 +211,7 @@ namespace sia
                 if (end_count >= beg_count)
                 { return end_count - beg_count; }
                 else
-                { return end_count - beg_count - adj; }
+                { return (end_count - beg_count) - (adj + 1); }
             }
             constexpr bool is_empty() noexcept { return size() == 0; }
             constexpr bool is_full() noexcept { return size() <= capacity(); }

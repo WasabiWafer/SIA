@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <scoped_allocator>
 #include <atomic>
 
 #include "SIA/utility/compressed_pair.hpp"
@@ -63,11 +64,11 @@ namespace sia
                     false_share<ring_counter<size_t, Size>> m_end;
                     false_share<state<ring_input_state>> m_in_state;
                     false_share<state<ring_output_state>> m_out_state;
-                    false_share<T*> m_data;
+                    false_share<T**> m_data;
                 };
             } // namespace ring_detail
             
-            template <typename T, size_t Size, typename Allocator = std::allocator<T>>
+            template <typename T, size_t Size, typename Allocator = std::scoped_allocator_adaptor<std::allocator<T>, std::allocator<T*>>>
             struct ring
             {
                 private:
@@ -80,14 +81,15 @@ namespace sia
                     compressed_pair<allocator_type, composition_t> m_compair;
                 
                     constexpr composition_t& get_composition() noexcept { return m_compair.second(); }
+
                     constexpr T* address(size_t at) noexcept { return get_composition().m_data->ptr() + at;}
 
                     template <typename... Tys>
                     constexpr void construct_at(T* at, Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Tys...>)
-                    { std::allocator_traits<allocator_type>::construct(get_allocator(), at, std::forward<Tys>(args)...); }
+                    { std::allocator_traits<allocator_type>::construct(get_outer_allocator(), at, std::forward<Tys>(args)...); }
 
                     constexpr void destruct_at(T* at) noexcept(std::is_nothrow_destructible_v<T>)
-                    { std::allocator_traits<allocator_type>::destroy(get_allocator(), at); }
+                    { std::allocator_traits<allocator_type>::destroy(get_outer_allocator(), at); }
 
                     constexpr void input_error_handle() noexcept
                     {
@@ -109,7 +111,7 @@ namespace sia
                     constexpr ring(const allocator_type& alloc = allocator_type{ })
                         noexcept(std::is_nothrow_constructible_v<allocator_type, const allocator_type&>)
                         : m_compair(splits::one_v, alloc)
-                    { get_composition().m_data = std::allocator_traits<allocator_type>::allocate(get_allocator(), capacity()); }
+                    { get_composition().m_data = std::allocator_traits<allocator_type>::allocate(get_inner_allocator(), capacity()); }
 
                     template <typename... Tys>
                     constexpr bool try_emplace_back(Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Tys...>)
@@ -127,7 +129,8 @@ namespace sia
                         return false;
                     }
 
-                    constexpr allocator_type& get_allocator() noexcept { return m_compair.first(); }
+                    constexpr allocator_type& get_inner_allocator() noexcept { return m_compair.first().inner_allocator(); }
+                    constexpr allocator_type& get_outer_allocator() noexcept { return m_compair.first().outer_allocator(); }
                     constexpr size_t capacity() noexcept { return Size; }
                     constexpr size_t size() noexcept
                     {
@@ -138,7 +141,7 @@ namespace sia
                         if (end_count >= beg_count)
                         { return end_count - beg_count; }
                         else
-                        { return end_count - beg_count - adj; }
+                        { return (end_count - beg_count) - (adj + 1); }
                     }
                     constexpr bool is_empty() noexcept { return size() == 0; }
                     constexpr bool is_full() noexcept { return size() == capacity(); }
