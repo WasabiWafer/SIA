@@ -61,9 +61,7 @@ namespace sia
                     // using state_type = ring_state;
                     false_share<ring_counter<size_t, Size>> m_begin;
                     false_share<ring_counter<size_t, Size>> m_end;
-                    false_share<state<direction>> m_in_dir;
                     false_share<state<ring_input_state>> m_in_state;
-                    false_share<state<direction>> m_out_dir;
                     false_share<state<ring_output_state>> m_out_state;
                     false_share<T*> m_data;
                 };
@@ -73,7 +71,6 @@ namespace sia
             struct ring
             {
                 private:
-                    using direction_t = ring_detail::direction;
                     using in_state_t = ring_detail::ring_input_state;
                     using out_state_t = ring_detail::ring_output_state;
                     using ring_counter_t = ring_detail::ring_counter<size_t, Size>;
@@ -98,14 +95,14 @@ namespace sia
                         in_state_t state = comp.m_in_state->status();
                         if ((state == in_state_t::none) || (state == in_state_t::end))
                         { }
-                        else if ((state == in_state_t::constructed) || (state == in_state_t::placing))
-                        {
-
-                        }
-                        else if ((state == in_state_t::placed))
-                        {
-
-                        }
+                        else if (state == in_state_t::constructing)
+                        { }
+                        else if (state == in_state_t::constructed)
+                        { }
+                        else if (state == in_state_t::placing)
+                        { }
+                        else if (state == in_state_t::placed)
+                        { }
                     }
 
                 public:
@@ -122,9 +119,7 @@ namespace sia
                         else
                         {
                             composition_t& comp = get_composition();
-                            comp.m_in_dir->set(direction_t::)
                             comp.m_in_state->set(in_state_t::constructing);
-                            
                             comp.m_in_state->set(in_state_t::constructed);
                             comp.m_in_state->set(in_state_t::placing);
                             comp.m_in_state->set(in_state_t::placed);
