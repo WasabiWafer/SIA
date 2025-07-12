@@ -71,9 +71,9 @@ namespace sia
         requires (std::is_pointer_v<FpType> && std::is_function_v<std::remove_pointer_t<FpType>>)
     struct is_nothrow_function<FpType, Args...> : std::bool_constant<requires(FpType fp) { { fp(Args{ }...) } noexcept; }> { };
 
-    template <typename FpType, typename Class, typename... Args>
+    template <typename FpType, typename ClassPtr, typename... Args>
         requires (std::is_member_function_pointer_v<FpType>)
-    struct is_nothrow_function<FpType, Class, Args...> : std::bool_constant<requires(Class c, FpType fp) { {(c.*fp)(Args{ }...)} noexcept; }> { };
+    struct is_nothrow_function<FpType, ClassPtr, Args...> : std::bool_constant<requires(FpType fp, ClassPtr c) { {(c->*fp)(Args{ }...)} noexcept; }> { };
     
     template <typename FpType, typename... Args>
     constexpr const bool is_nothrow_function_v = is_nothrow_function<FpType, Args...>::value;

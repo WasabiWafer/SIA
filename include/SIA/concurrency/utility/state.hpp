@@ -17,31 +17,37 @@ namespace sia
             atomic_t m_state;
 
         public:
-            constexpr state() noexcept = default;
-            constexpr state(const state& arg) noexcept
-                : m_state(arg.status())
+            constexpr state() noexcept(std::is_nothrow_default_constructible_v<atomic_t>)
+                : m_state()
             { }
-            constexpr state& operator=(const state& arg) noexcept
-            {
-                this->set(arg.status());
-                return *this;
-            }
-            constexpr state(T arg) noexcept
+
+            constexpr state(T arg) noexcept(std::is_nothrow_constructible_v<atomic_t, T>)
                 : m_state(arg)
             { }
-            constexpr state& operator=(T arg) noexcept
+
+            constexpr state(const state& arg) noexcept(std::is_nothrow_constructible_v<atomic_t, T>)
+                : m_state(arg.status())
+            { }
+
+            constexpr state& operator=(T arg) noexcept(noexcept(this->set(arg)))
             {
                 this->set(arg);
                 return *this;
             }
 
-            T status() const noexcept
+            constexpr state& operator=(const state& arg) noexcept(noexcept(this->set(arg.status())))
+            {
+                this->set(arg.status());
+                return *this;
+            }
+
+            constexpr T status() const noexcept(noexcept(m_state.load(stamps::memory_orders::relaxed_v)))
             { return m_state.load(stamps::memory_orders::relaxed_v); }
 
-            void set(const T& arg) noexcept
+            constexpr void set(T arg) noexcept(noexcept(m_state.store(arg, stamps::memory_orders::relaxed_v)))
             { m_state.store(arg, stamps::memory_orders::relaxed_v); }
 
-            bool compare_exchange(tags::object_state& expt, T desr) noexcept
+            constexpr bool compare_exchange(T& expt, T desr) noexcept(m_state.compare_exchange_weak(expt, desr, stamps::memory_orders::relaxed_v, stamps::memory_orders::relaxed_v))
             { return m_state.compare_exchange_weak(expt, desr, stamps::memory_orders::relaxed_v, stamps::memory_orders::relaxed_v); }
     };
 } // namespace sia
