@@ -30,7 +30,7 @@ namespace sia
             constexpr mutex& operator=(mutex&&) noexcept = delete;
 
             bool try_lock(thread_id_t default_arg = thread_id_t{ }) noexcept
-            { return this->m_owner.compare_exchange_weak(default_arg, this->get_thread_id(), stamps::memory_orders::relaxed_v, stamps::memory_orders::relaxed_v); }
+            { return this->m_owner.compare_exchange_weak(default_arg, this->get_thread_id(), std::memory_order::relaxed, std::memory_order::relaxed); }
 
             template <tags::loop LoopTag, tags::wait WaitTag, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
             bool try_lock_loop(LoopTimeType ltt_v = stamps::basis::empty_loop_val, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
@@ -41,16 +41,16 @@ namespace sia
             
             void unlock() noexcept
             {
-                if (this->m_owner.load(stamps::memory_orders::relaxed_v) == this->get_thread_id())
-                { this->m_owner.store(thread_id_t{ }, stamps::memory_orders::relaxed_v); }
+                if (this->m_owner.load(std::memory_order::relaxed) == this->get_thread_id())
+                { this->m_owner.store(thread_id_t{ }, std::memory_order::relaxed); }
             }
 
-            thread_id_t owner() noexcept { return m_owner.load(stamps::memory_orders::relaxed_v); }
+            thread_id_t owner() noexcept { return m_owner.load(std::memory_order::relaxed); }
 
             void force_lock() noexcept
-            { this->m_owner.store(this->get_thread_id(), stamps::memory_orders::relaxed_v); }
+            { this->m_owner.store(this->get_thread_id(), std::memory_order::relaxed); }
 
             void force_unlock() noexcept
-            { this->m_owner.store(thread_id_t{ }, stamps::memory_orders::relaxed_v); }
+            { this->m_owner.store(thread_id_t{ }, std::memory_order::relaxed); }
     };
 } // namespace sia

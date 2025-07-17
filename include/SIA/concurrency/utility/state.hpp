@@ -41,13 +41,13 @@ namespace sia
                 return *this;
             }
 
-            constexpr T status() const noexcept(noexcept(m_state.load(stamps::memory_orders::relaxed_v)))
-            { return m_state.load(stamps::memory_orders::relaxed_v); }
+            constexpr T status() const noexcept(noexcept(m_state.load(std::memory_order::relaxed)))
+            { return m_state.load(std::memory_order::relaxed); }
 
-            constexpr void set(T arg) noexcept(noexcept(m_state.store(arg, stamps::memory_orders::relaxed_v)))
-            { m_state.store(arg, stamps::memory_orders::relaxed_v); }
+            constexpr void set(T arg) noexcept(noexcept(m_state.store(arg, std::memory_order::relaxed)))
+            { m_state.store(arg, std::memory_order::relaxed); }
 
-            constexpr bool compare_exchange(T& expt, T desr) noexcept(m_state.compare_exchange_weak(expt, desr, stamps::memory_orders::relaxed_v, stamps::memory_orders::relaxed_v))
-            { return m_state.compare_exchange_weak(expt, desr, stamps::memory_orders::relaxed_v, stamps::memory_orders::relaxed_v); }
+            constexpr bool compare_exchange(T& expt, T desr) noexcept(m_state.compare_exchange_weak(expt, desr, std::memory_order::relaxed, std::memory_order::relaxed))
+            { return m_state.compare_exchange_weak(expt, desr, std::memory_order::relaxed, std::memory_order::relaxed); }
     };
 } // namespace sia

@@ -1,13 +1,14 @@
 #pragma once
 
 #include <memory>
-#include <scoped_allocator>
 #include <atomic>
 
-#include "SIA/utility/compressed_pair.hpp"
-#include "SIA/concurrency/utility/state.hpp"
+#include "SIA/container/ring.hpp"
+
 #include "SIA/concurrency/internals/define.hpp"
 #include "SIA/concurrency/internals/types.hpp"
+#include "SIA/concurrency/utility/tools.hpp"
+#include "SIA/concurrency/utility/state.hpp"
 
 namespace sia
 {
@@ -17,64 +18,23 @@ namespace sia
         {
             namespace ring_detail
             {
-                template <typename T, T Size>
-                    requires(std::atomic<T>::is_always_lock_free)
-                struct ring_counter
-                {
-                    using counter_type = T;
-                    using atomic_t = std::atomic<counter_type>;
-                    atomic_t m_counter;
-
-                    static constexpr counter_type adjustment() noexcept
-                    { return std::numeric_limits<counter_type>::max() % Size; }
-
-                    constexpr void inc() noexcept
-                    {
-                        constexpr auto rlx = stamps::memory_orders::relaxed_v;
-                        if (m_counter.load(rlx) == std::numeric_limits<counter_type>::max())
-                        { m_counter.store(adjustment() + 1); }
-                        else
-                        { m_counter.fetch_add(1); }
-                    }
-
-                    constexpr void dec() noexcept
-                    {
-                        constexpr auto rlx = stamps::memory_orders::relaxed_v;
-                        if (m_counter.load(rlx) == std::numeric_limits<counter_type>::min())
-                        { m_counter.store(std::numeric_limits<counter_type>::max() - adjustment() - 1); }
-                        else
-                        { m_counter.fetch_sub(1); }
-                    }
-                    
-                    constexpr void add(const counter_type& arg) noexcept { m_counter.fetch_add(arg); }
-                    constexpr void sub(const counter_type& arg) noexcept { m_counter.fetch_sub(arg); }
-                    constexpr counter_type count() const noexcept { return m_counter.load(stamps::memory_orders::relaxed_v); }
-                    constexpr counter_type offset() const noexcept { return count() % Size; }
-                };
-
-                enum class direction { none, front, back };
-                enum class ring_input_state { none, constructing, constructed, placing, placed, end };
-                enum class ring_output_state { none, constructing, constructed, placing, placed };
-
                 template <typename T, size_t Size>
+                    requires (std::atomic<sia::ring_detail::ring_counter<size_t, Size>>::is_always_lock_free)
                 struct ring_composition
                 {
-                    // using state_type = ring_state;
-                    false_share<ring_counter<size_t, Size>> m_begin;
-                    false_share<ring_counter<size_t, Size>> m_end;
-                    false_share<state<ring_input_state>> m_in_state;
-                    false_share<state<ring_output_state>> m_out_state;
-                    false_share<T**> m_data;
+                    using ring_counter_t = sia::ring_detail::ring_counter<size_t, Size>;
+                    using atomic_t = std::atomic<ring_counter_t>;
+                    false_share<atomic_t> m_begin;
+                    false_share<atomic_t> m_end;
+                    false_share<T*> m_data;
                 };
             } // namespace ring_detail
             
-            template <typename T, size_t Size, typename Allocator = std::scoped_allocator_adaptor<std::allocator<T>, std::allocator<T*>>>
+            template <typename T, size_t Size, typename Allocator = std::allocator<T>>
             struct ring
             {
                 private:
-                    using in_state_t = ring_detail::ring_input_state;
-                    using out_state_t = ring_detail::ring_output_state;
-                    using ring_counter_t = ring_detail::ring_counter<size_t, Size>;
+                    using ring_counter_t = sia::ring_detail::ring_counter<size_t, Size>;
                     using allocator_type = Allocator;
                     using composition_t = ring_detail::ring_composition<T, Size>;
 
@@ -82,69 +42,143 @@ namespace sia
                 
                     constexpr composition_t& get_composition() noexcept { return m_compair.second(); }
 
-                    constexpr T* address(size_t at) noexcept { return get_composition().m_data->ptr() + at;}
+                    constexpr T* address(size_t at) noexcept { return get_composition().m_data.ref() + at;}
 
                     template <typename... Tys>
                     constexpr void construct_at(T* at, Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Tys...>)
-                    { std::allocator_traits<allocator_type>::construct(get_outer_allocator(), at, std::forward<Tys>(args)...); }
+                    { std::allocator_traits<allocator_type>::construct(get_allocator(), at, std::forward<Tys>(args)...); }
 
                     constexpr void destruct_at(T* at) noexcept(std::is_nothrow_destructible_v<T>)
-                    { std::allocator_traits<allocator_type>::destroy(get_outer_allocator(), at); }
+                    { std::allocator_traits<allocator_type>::destroy(get_allocator(), at); }
 
-                    constexpr void input_error_handle() noexcept
+                    constexpr size_t size(size_t beg, size_t end) noexcept
+                    {
+                        constexpr const size_t adj = ring_counter_t::adjustment();
+                        if (end >= beg)
+                        { return end - beg; }
+                        else
+                        { return end - beg - adj; }
+                    }
+                    constexpr bool is_empty(size_t beg, size_t end) noexcept { return size(beg, end) == 0; }
+                    constexpr bool is_full(size_t beg, size_t end) noexcept { return size(beg, end) == Size; }
+
+                    constexpr std::pair<ring_counter_t, ring_counter_t> get_pair() noexcept
                     {
                         composition_t& comp = get_composition();
-                        in_state_t state = comp.m_in_state->status();
-                        if ((state == in_state_t::none) || (state == in_state_t::end))
-                        { }
-                        else if (state == in_state_t::constructing)
-                        { }
-                        else if (state == in_state_t::constructed)
-                        { }
-                        else if (state == in_state_t::placing)
-                        { }
-                        else if (state == in_state_t::placed)
-                        { }
+                        return {comp.m_begin->load(std::memory_order_relaxed), comp.m_end->load(std::memory_order_relaxed)};
                     }
 
                 public:
                     constexpr ring(const allocator_type& alloc = allocator_type{ })
                         noexcept(std::is_nothrow_constructible_v<allocator_type, const allocator_type&>)
                         : m_compair(splits::one_v, alloc)
-                    { get_composition().m_data = std::allocator_traits<allocator_type>::allocate(get_inner_allocator(), capacity()); }
+                    { get_composition().m_data = std::allocator_traits<allocator_type>::allocate(get_allocator(), capacity()); }
+
+                    constexpr ~ring() noexcept(std::is_nothrow_destructible_v<T>)
+                    { std::allocator_traits<allocator_type>::deallocate(get_allocator(), address(0), capacity()); }
+
+                    constexpr allocator_type& get_allocator() noexcept { return m_compair.first(); }
+                    constexpr size_t capacity() noexcept { return Size; }
+                    constexpr size_t size() noexcept
+                    {
+                        composition_t& comp = get_composition();
+                        constexpr const size_t adj = ring_counter_t::adjustment();
+                        size_t beg_count = comp.m_begin->load(std::memory_order::relaxed).count();
+                        size_t end_count = comp.m_end->load(std::memory_order::relaxed).count();
+                        if (end_count >= beg_count)
+                        { return end_count - beg_count; }
+                        else
+                        { return end_count - beg_count - adj; }
+                    }
+                    constexpr bool is_empty() noexcept { return size() == 0; }
+                    constexpr bool is_full() noexcept { return size() == capacity(); }
 
                     template <typename... Tys>
                     constexpr bool try_emplace_back(Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Tys...>)
                     {
-                        if (is_full())
-                        { return false; }
-                        else
+                        auto pair = get_pair();
+                        if (!is_full(pair.first.count(), pair.second.count()))
                         {
-                            composition_t& comp = get_composition();
-                            comp.m_in_state->set(in_state_t::constructing);
-                            comp.m_in_state->set(in_state_t::constructed);
-                            comp.m_in_state->set(in_state_t::placing);
-                            comp.m_in_state->set(in_state_t::placed);
+                            construct_at(address(pair.second.offset()), std::forward<Tys>(args)...);
+                            pair.second.inc();
+                            get_composition().m_end->store(pair.second, std::memory_order::relaxed);
+                            return true;
+                        }
+                        return false;
+                    }
+                    constexpr bool try_push_back(const T& arg) noexcept(std::is_nothrow_constructible_v<T, const T&>)
+                    { return try_emplace_back(arg); }
+                    constexpr bool try_push_back(T&& arg) noexcept(std::is_nothrow_constructible_v<T, T&&>)
+                    { return try_emplace_back(std::move(arg)); }
+                    
+                    template <typename Ty>
+                        requires (std::is_assignable_v<Ty, T&> || std::is_assignable_v<Ty, T&&>)
+                    constexpr bool try_extract_front(Ty&& arg)
+                        noexcept
+                        (
+                            (std::is_assignable_v<Ty, T&&> && std::is_nothrow_assignable_v<Ty, T&&>) ||
+                            (!std::is_assignable_v<Ty, T&&> && std::is_assignable_v<Ty, T&> && std::is_nothrow_assignable_v<Ty, T&>)
+                        )
+                    {
+                        auto pair = get_pair();
+                        if (!is_empty(pair.first.count(), pair.second.count()))
+                        {
+                            T* target = address(pair.first.offset());
+                            if (std::is_assignable_v<Ty, T&&>) { arg = std::move(*target); }
+                            else { arg = *target; }
+                            destruct_at(target);
+                            pair.first.inc();
+                            get_composition().m_begin->store(pair.first, std::memory_order::relaxed);
+                            return true;
                         }
                         return false;
                     }
 
-                    constexpr allocator_type& get_inner_allocator() noexcept { return m_compair.first().inner_allocator(); }
-                    constexpr allocator_type& get_outer_allocator() noexcept { return m_compair.first().outer_allocator(); }
-                    constexpr size_t capacity() noexcept { return Size; }
-                    constexpr size_t size() noexcept
-                    {
-                        constexpr const size_t adj = ring_counter_t::adjustment();
-                        composition_t& comp = get_composition();
-                        size_t beg_count = comp.m_begin->count();
-                        size_t end_count = comp.m_end->count();
-                        if (end_count >= beg_count)
-                        { return end_count - beg_count; }
-                        else
-                        { return (end_count - beg_count) - (adj + 1); }
-                    }
-                    constexpr bool is_empty() noexcept { return size() == 0; }
-                    constexpr bool is_full() noexcept { return size() == capacity(); }
+                    constexpr bool try_pull_front(T& arg)
+                        noexcept
+                        (
+                            (std::is_move_assignable_v<T> && std::is_nothrow_move_assignable_v<T>) ||
+                            (!std::is_move_assignable_v<T> && std::is_copy_assignable_v<T> && std::is_nothrow_copy_assignable_v<T>)
+                        )
+                    { return try_extract_front(arg); }
+
+                    template <tags::loop LoopTag, tags::wait WaitTag, typename... Tys>
+                    constexpr bool loop_emplace_back(auto ltt_v, auto wtt_v, Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Tys...>)
+                    { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, &ring::try_emplace_back<Tys...>, this, std::forward<Tys>(args)...); }
+
+                    template <tags::loop LoopTag, tags::wait WaitTag, typename Ty>
+                    constexpr bool loop_extract_front(auto ltt_v, auto wtt_v, Ty&& arg)
+                        noexcept
+                        (
+                            (std::is_assignable_v<Ty, T&&> && std::is_nothrow_assignable_v<Ty, T&&>) ||
+                            (!std::is_assignable_v<Ty, T&&> && std::is_assignable_v<Ty, T&> && std::is_nothrow_assignable_v<Ty, T&>)
+                        )
+                    { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, &ring::try_extract_front<Ty>, this, std::forward<Ty>(arg));}
+
+                    template <typename... Tys>
+                    constexpr void emplace_back(Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Tys...>)
+                    { loop_emplace_back<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, std::forward<Tys>(args)...); }
+                    constexpr void push_back(const T& arg) noexcept(std::is_nothrow_constructible_v<T, const T&>)
+                    { loop_emplace_back<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, arg); }
+                    constexpr void push_back(T&& arg) noexcept(std::is_nothrow_constructible_v<T, T&&>)
+                    { loop_emplace_back<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, std::move(arg)); }
+
+                    template <typename Ty>
+                    constexpr void extract_front(Ty&& arg)
+                        noexcept
+                        (
+                            (std::is_assignable_v<Ty, T&&> && std::is_nothrow_assignable_v<Ty, T&&>) ||
+                            (!std::is_assignable_v<Ty, T&&> && std::is_assignable_v<Ty, T&> && std::is_nothrow_assignable_v<Ty, T&>)
+                        )
+                    { loop_extract_front<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, std::forward<Ty>(arg)); }
+
+                    constexpr void pull_front(T& arg)
+                        noexcept
+                        (
+                            (std::is_move_assignable_v<T> && std::is_nothrow_move_assignable_v<T>) ||
+                            (!std::is_move_assignable_v<T> && std::is_copy_assignable_v<T> && std::is_nothrow_copy_assignable_v<T>)
+                        )
+                    { loop_extract_front<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, arg); }
             };
         } // namespace spsc
         

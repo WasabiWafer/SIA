@@ -17,22 +17,21 @@ namespace sia
                 counter_type m_counter;
 
                 static constexpr counter_type adjustment() noexcept
-                { return std::numeric_limits<counter_type>::max() % Size; }
-
+                { return (std::numeric_limits<counter_type>::max() % Size) + 1; }
                 constexpr void inc() noexcept
                 {
-                    if (m_counter == std::numeric_limits<counter_type>::max())
-                    { m_counter = adjustment() + 1; }
+                    if (count() == std::numeric_limits<counter_type>::max())
+                    { add(adjustment() + 1); }
                     else
-                    { m_counter += 1; }
+                    { add(1); }
                 }
 
                 constexpr void dec() noexcept
                 {
-                    if (m_counter == std::numeric_limits<counter_type>::min())
-                    { m_counter = std::numeric_limits<counter_type>::max() - adjustment() - 1; }
+                    if (count() == std::numeric_limits<counter_type>::min())
+                    { sub(adjustment() + 1); }
                     else
-                    { m_counter -= 1; }
+                    { sub(1); }
                 }
                 
                 constexpr void add(const counter_type& arg) noexcept { m_counter += arg; }
@@ -211,10 +210,10 @@ namespace sia
                 if (end_count >= beg_count)
                 { return end_count - beg_count; }
                 else
-                { return (end_count - beg_count) - (adj + 1); }
+                { return (end_count - beg_count) - adj; }
             }
             constexpr bool is_empty() noexcept { return size() == 0; }
-            constexpr bool is_full() noexcept { return size() <= capacity(); }
+            constexpr bool is_full() noexcept { return size() == capacity(); }
 
             iterator_type begin() noexcept
             {

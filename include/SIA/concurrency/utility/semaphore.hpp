@@ -36,8 +36,8 @@ namespace sia
 
             constexpr bool try_acquire() noexcept
             {
-                constexpr auto acq = stamps::memory_orders::acquire_v;
-                constexpr auto rle = stamps::memory_orders::release_v;
+                constexpr auto acq = std::memory_order::acquire;
+                constexpr auto rle = std::memory_order::release;
 
                 value_t cur = this->m_count.load(acq);
                 if (cur != 0)
@@ -61,6 +61,6 @@ namespace sia
             { try_acquire_loop<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val); }
 
             constexpr void release() noexcept
-            { this->m_count.fetch_add(this->num_step(), stamps::memory_orders::relaxed_v); }
+            { this->m_count.fetch_add(this->num_step(), std::memory_order::relaxed); }
     };
 } // namespace sia
