@@ -113,4 +113,77 @@ namespace sia
             constexpr const auto&   ref() const noexcept
             { return *this->ptr<N>(); }
     };
+
+    namespace frame_detail
+    {
+        template <size_t Idx, typename... Ts>
+            requires (Idx > 0)
+        constexpr size_t get_byte_pos(sia::type_index<Ts...>) noexcept
+        {
+            size_t ret { };
+            ((ret += sizeof(Ts)), ...);
+            return ret;
+        }
+
+        template <size_t Idx, typename... Ts>
+            requires (Idx == 0)
+        constexpr size_t get_byte_pos(sia::type_index<Ts...>) noexcept
+        { return 0; }
+
+        template <typename T, size_t Idx, typename... Ts>
+            requires (Idx > 0)
+        constexpr auto gen_layout(sia::type_index<Ts...>) noexcept
+        {
+            using index_t = sia::type_index<Ts...>;
+            using select_index_t = index_t::template select<0, Idx>;
+            return sia::layout<T, "", get_byte_pos<Idx>(select_index_t{ })>{ };
+        }
+
+        template <typename T, size_t Idx, typename... Ts>
+            requires (Idx == 0)
+        constexpr auto gen_layout(sia::type_index<Ts...>) noexcept
+        { return sia::layout<T, "", 0>{ }; }
+
+        template <typename... Ts, size_t... Seqs>
+        constexpr auto gen_frame(std::index_sequence<Seqs...> seq) noexcept
+        {
+            using index_t = sia::type_index<Ts...>;
+            return sia::frame<decltype(gen_layout<Ts, Seqs>(index_t{ }))...>{ };
+        }
+
+        template <typename... Ts>
+        struct tuple_frame_impl;
+
+        template <typename... Ts, size_t... Seqs>
+        struct tuple_frame_impl<std::index_sequence<Seqs...>, Ts...> : decltype(gen_frame<Ts...>(std::make_index_sequence<sizeof...(Ts)>{ }))
+        {
+            private:
+                using base_t = decltype(gen_frame<Ts...>(std::make_index_sequence<sizeof...(Ts)>{ }));
+            public:
+                constexpr tuple_frame_impl() noexcept = default;
+                constexpr tuple_frame_impl(const Ts&... args)
+                    noexcept((std::is_nothrow_constructible_v<Ts, const Ts&> && ...))
+                    : base_t()
+                { ((this->base_t::template ref<Seqs>() = args), ...); }
+        };
+    } // namespace frame_detail
+
+
+    template <typename... Ts>
+    struct tuple_frame : public frame_detail::tuple_frame_impl<std::make_index_sequence<sizeof...(Ts)>, Ts...>
+    {
+        private:
+            using base_t = frame_detail::tuple_frame_impl<std::make_index_sequence<sizeof...(Ts)>, Ts...>;
+        public:
+            constexpr tuple_frame() noexcept = default;
+            constexpr tuple_frame(const Ts&... args) 
+                noexcept((std::is_nothrow_constructible_v<Ts, const Ts&> && ...))
+                : base_t(args...)
+            { }
+
+            // maybe intellisense can't deducing 'frame' type.
+            // this function could help no error(not actually error) / convenient use.
+            template <size_t N>
+            constexpr typename auto& get() noexcept { return this->base_t::template ref<N>(); }
+    };
 } // namespace sia

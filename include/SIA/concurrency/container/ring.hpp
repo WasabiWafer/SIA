@@ -1,11 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <scoped_allocator>
 #include <atomic>
 
 #include "SIA/container/ring.hpp"
 
-#include "SIA/concurrency/internals/define.hpp"
 #include "SIA/concurrency/internals/types.hpp"
 #include "SIA/concurrency/utility/tools.hpp"
 #include "SIA/concurrency/utility/state.hpp"
@@ -70,7 +70,6 @@ namespace sia
 
                 public:
                     constexpr ring(const allocator_type& alloc = allocator_type{ })
-                        noexcept(std::is_nothrow_constructible_v<allocator_type, const allocator_type&>)
                         : m_compair(splits::one_v, alloc)
                     { get_composition().m_data = std::allocator_traits<allocator_type>::allocate(get_allocator(), capacity()); }
 
@@ -124,7 +123,7 @@ namespace sia
                         if (!is_empty(pair.first.count(), pair.second.count()))
                         {
                             T* target = address(pair.first.offset());
-                            if (std::is_assignable_v<Ty, T&&>) { arg = std::move(*target); }
+                            if constexpr (std::is_assignable_v<Ty, T&&>) { arg = std::move(*target); }
                             else { arg = *target; }
                             destruct_at(target);
                             pair.first.inc();
@@ -184,15 +183,53 @@ namespace sia
         
         namespace mpmc
         {
+            
             namespace ring_detail
             {
-                
+                enum class ring_object_state {  };
+
+                template <typename T, size_t Size>
+                struct ring_composition
+                {
+                    using ring_counter_t = sia::ring_detail::ring_counter<T, Size>;
+                    using atomic_t = std::atomic<ring_counter_t>;
+                    false_share<atomic_t> m_begin;
+                    false_share<atomic_t> m_end;
+                    false_share<ring_object_state*> m_state;
+                    false_share<T*> m_data;
+                };
             } // namespace ring_detail
             
-            template <typename T, size_t Size, typename Allocator = std::allocator<T>>
+            template <typename T, size_t Size, typename Allocator = std::scoped_allocator_adaptor<T, ring_detail::ring_object_state>>
             struct ring
             {
+                private:
+                    using allocator_type = Allocator;
+                    using composition_t = ring_detail::ring_composition<T, Size>;
+                    using ring_counter_t = sia::ring_detail::ring_counter<size_t, Size>;
 
+                    compressed_pair<allocator_type, composition_t> m_compair;
+
+                    constexpr composition_t& get_composition() noexcept { return m_compair.second(); }
+
+                public:
+                    using outer_allocator_value_type = T;
+                    using inner_allocator_value_type = ring_detail::ring_object_state;
+
+                    constexpr allocator_type& get_outer_allocator() noexcept { return m_compair.first(); }
+                    constexpr allocator_type& get_inner_allocator() noexcept { return m_compair.first(); }
+                    constexpr size_t capacity() noexcept { return Size; }
+
+                    constexpr ring(const allocator_type& alloc = allocator_type{ })
+                        : m_compair{splits::one_v, alloc}
+                    {  }
+
+                    template <typename... Tys>
+                    constexpr bool try_emplace_back() noexcept(std::is_nothrow_constructible_v<T, Tys...>)
+                    {
+
+                        return false;
+                    }
             };
         } // namespace mpmc
     } // namespace concurrency
