@@ -36,34 +36,8 @@ namespace sia
     struct is_same_any<T> : public std::false_type { };
     template <typename T, typename... Ts>
     constexpr const bool is_same_any_v = is_same_any<T, Ts...>::value;
-    
-    // namespace tools_detail
-    // {
-    //     template <auto Func, typename Arg, typename... Args>
-    //     struct is_nothrow_raw_function : std::bool_constant<requires() { {Func(Arg{ }, Args{ }...)} noexcept; }> { };
-    //     template <auto Func, typename... Args>
-    //     constexpr const bool is_nothrow_function_v = is_nothrow_function<Func, Args...>::value;
-    
-    //     template <auto Func, typename Class, typename... Args>
-    //     struct is_nothrow_member_function : std::bool_constant<requires(Class c) { {(c.*Func)(Args{ }...)} noexcept; }> { };
-    //     template <typename Class, auto Func, typename... Args>
-    //     constexpr const bool is_nothrow_member_function_v = is_nothrow_member_function<Class, Func, Args...>::value;
-    // } // namespace tools_detail
-    
-    // template <auto Func, typename... Args>
-    // struct is_nothrow_function;
 
-    // template <auto Func, typename... Args>
-    //     requires (std::is_pointer_v<decltype(Func)> && std::is_function_v<std::remove_pointer_t<decltype(Func)>>)
-    // struct is_nothrow_function<Func, Args...> : std::bool_constant<requires() { {Func(Args{ }...)} noexcept; }> { };
-
-    // template <auto Func, typename Class, typename... Args>
-    //     requires (std::is_member_function_pointer_v<decltype(Func)>)
-    // struct is_nothrow_function<Func, Class, Args...> : std::bool_constant<requires(Class c) { {(c.*Func)(Args{ }...)} noexcept; }> { };
-    
-    // template <auto Func, typename... Args>
-    // constexpr const bool is_nothrow_function_v = is_nothrow_function<Func, Args...>::value;
-
+    // should be replace to std::is_nothrow_invocalbe
     template <typename FuncType, typename... Args>
     struct is_nothrow_function;
 
@@ -130,28 +104,8 @@ namespace sia
     template <typename T, size_t N>
     using make_entity_sequence = tools_detail::make_entity_sequence_impl<T, std::make_integer_sequence<size_t, N>>::type;
     
-    template <typename T, size_t N, tags::memory_location Tag = tags::memory_location::stack, typename Allocator = std::allocator<T>>
-    struct chunk;
-    
-    template <typename T, size_t N, typename Allocator>
-    struct chunk<T, N, tags::memory_location::heap, Allocator>
-    {
-        private:
-            using allocator_traits_t = std::allocator_traits<Allocator>;
-            compressed_pair<Allocator, T*> m_compair;
-        public:
-            constexpr chunk(const Allocator& alloc = Allocator()) noexcept(noexcept(Allocator(alloc)) && noexcept(allocator_traits_t::allocate(alloc, N)))
-                : m_compair(splits::one_v, alloc)
-            { m_compair.second() = allocator_traits_t::allocate(m_compair.first(), N);}
-            ~chunk() noexcept(noexcept(allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), N)))
-            { allocator_traits_t::deallocate(m_compair.first(), m_compair.second(), N); }
-
-            constexpr T* ptr() noexcept { return m_compair.second(); }
-            constexpr const T* ptr() const noexcept { return m_compair.second(); }
-    };
-
     template <typename T, size_t N>
-    struct chunk<T, N, tags::memory_location::stack>
+    struct chunk
     {
         // no private member for Aggregate initialization.
         T m_chunk[N];

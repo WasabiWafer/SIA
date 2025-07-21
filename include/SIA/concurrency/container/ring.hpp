@@ -73,7 +73,7 @@ namespace sia
                         : m_compair(splits::one_v, alloc)
                     { get_composition().m_data = std::allocator_traits<allocator_type>::allocate(get_allocator(), capacity()); }
 
-                    constexpr ~ring() noexcept(std::is_nothrow_destructible_v<T>)
+                    constexpr ~ring()
                     { std::allocator_traits<allocator_type>::deallocate(get_allocator(), address(0), capacity()); }
 
                     constexpr allocator_type& get_allocator() noexcept { return m_compair.first(); }
@@ -200,7 +200,7 @@ namespace sia
                 };
             } // namespace ring_detail
             
-            template <typename T, size_t Size, typename Allocator = std::scoped_allocator_adaptor<T, ring_detail::ring_object_state>>
+            template <typename T, size_t Size, typename Allocator = std::scoped_allocator_adaptor<std::allocator<T>, std::allocator<ring_detail::ring_object_state>>>
             struct ring
             {
                 private:
@@ -215,14 +215,27 @@ namespace sia
                 public:
                     using outer_allocator_value_type = T;
                     using inner_allocator_value_type = ring_detail::ring_object_state;
+                    using outer_allocator_type = allocator_type::outer_allocator_type;
+                    using inner_allocator_type = allocator_type::inner_allocator_type;
 
-                    constexpr allocator_type& get_outer_allocator() noexcept { return m_compair.first(); }
-                    constexpr allocator_type& get_inner_allocator() noexcept { return m_compair.first(); }
+                    constexpr outer_allocator_type& get_outer_allocator() noexcept { return m_compair.first().outer_allocator(); }
+                    constexpr inner_allocator_type& get_inner_allocator() noexcept { return m_compair.first().inner_allocator(); }
+                    constexpr allocator_type& get_allocator() noexcept { return m_compair.first(); }
                     constexpr size_t capacity() noexcept { return Size; }
 
                     constexpr ring(const allocator_type& alloc = allocator_type{ })
                         : m_compair{splits::one_v, alloc}
-                    {  }
+                    {
+                        composition_t& comp = get_composition();
+                        comp.m_state = std::allocator_traits<inner_allocator_type>::allocate(get_inner_allocator(), capacity());
+                        comp.m_data = std::allocator_traits<outer_allocator_type>::allocate(get_outer_allocator(), capacity());
+                    }
+
+                    constexpr ~ring()
+                    {
+                        composition_t& comp = get_composition();
+                        
+                    }
 
                     template <typename... Tys>
                     constexpr bool try_emplace_back() noexcept(std::is_nothrow_constructible_v<T, Tys...>)
