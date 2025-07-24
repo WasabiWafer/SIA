@@ -19,7 +19,7 @@ namespace sia
 
         template <typename... Ts>
             requires (get_total_size<Ts...>() <= std::hardware_constructive_interference_size)
-        struct true_share_impl : align_wrapper<tuple_frame<Ts...>, std::hardware_constructive_interference_size>
+        struct false_share_impl : align_wrapper<tuple_frame<Ts...>, std::hardware_constructive_interference_size>
         { };
     } // namespace types_detail
     
@@ -27,7 +27,7 @@ namespace sia
     using thread_id_t = unsigned_integer_t<sizeof(std::thread::id)>;
 
     template <typename T>
-    using false_share = align_wrapper<T, std::hardware_destructive_interference_size>;
+    using true_share = align_wrapper<T, std::hardware_destructive_interference_size>;
     template <typename... Ts>
-    using true_share  = types_detail::true_share_impl<Ts...>;
+    using false_share  = types_detail::false_share_impl<Ts...>;
 } // namespace sia

@@ -38,6 +38,18 @@ namespace sia
                 constexpr void sub(const counter_type& arg) noexcept { m_counter -= arg; }
                 constexpr counter_type offset() const noexcept { return m_counter % Size; }
                 constexpr counter_type count() const noexcept { return m_counter; }
+                constexpr counter_type next() const noexcept
+                {
+                    ring_counter ret {*this};
+                    ret.inc();
+                    return ret.count();
+                }
+                constexpr counter_type prev() const noexcept
+                {
+                    ring_counter ret {*this};
+                    ret.dec();
+                    return ret.count();
+                }
         };
 
         template <typename T, size_t Size>
