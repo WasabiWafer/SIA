@@ -47,7 +47,7 @@ namespace sia
             constexpr void set(T arg) noexcept(noexcept(m_state.store(arg, std::memory_order::relaxed)))
             { m_state.store(arg, std::memory_order::relaxed); }
 
-            constexpr bool compare_exchange(T& expt, T desr) noexcept(m_state.compare_exchange_weak(expt, desr, std::memory_order::relaxed, std::memory_order::relaxed))
+            constexpr bool compare_exchange(T& expt, T desr) noexcept(noexcept(m_state.compare_exchange_weak(expt, desr, std::memory_order::relaxed, std::memory_order::relaxed)))
             { return m_state.compare_exchange_weak(expt, desr, std::memory_order::relaxed, std::memory_order::relaxed); }
     };
 } // namespace sia

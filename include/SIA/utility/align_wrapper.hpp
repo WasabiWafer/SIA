@@ -36,6 +36,8 @@ namespace sia
             using self_t = align_wrapper;
 
         public:
+            using value_type = T;
+            
             constexpr align_wrapper() noexcept(std::is_nothrow_default_constructible_v<T>)
                 : base_t()
             { std::construct_at(this->self_t::ptr()); }

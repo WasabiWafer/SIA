@@ -117,18 +117,12 @@ namespace sia
     namespace frame_detail
     {
         template <size_t Idx, typename... Ts>
-            requires (Idx > 0)
         constexpr size_t get_byte_pos(sia::type_index<Ts...>) noexcept
         {
             size_t ret { };
             ((ret += sizeof(Ts)), ...);
             return ret;
         }
-
-        template <size_t Idx, typename... Ts>
-            requires (Idx == 0)
-        constexpr size_t get_byte_pos(sia::type_index<Ts...>) noexcept
-        { return 0; }
 
         template <typename T, size_t Idx, typename... Ts>
             requires (Idx > 0)
@@ -155,16 +149,17 @@ namespace sia
         struct tuple_frame_impl;
 
         template <typename... Ts, size_t... Seqs>
-        struct tuple_frame_impl<std::index_sequence<Seqs...>, Ts...> : decltype(gen_frame<Ts...>(std::make_index_sequence<sizeof...(Ts)>{ }))
+        struct tuple_frame_impl<std::index_sequence<Seqs...>, Ts...> : public decltype(gen_frame<Ts...>(std::make_index_sequence<sizeof...(Ts)>{ }))
         {
             private:
                 using base_t = decltype(gen_frame<Ts...>(std::make_index_sequence<sizeof...(Ts)>{ }));
             public:
                 constexpr tuple_frame_impl() noexcept = default;
-                constexpr tuple_frame_impl(const Ts&... args)
-                    noexcept((std::is_nothrow_constructible_v<Ts, const Ts&> && ...))
+                template <typename... Tys>
+                constexpr tuple_frame_impl(Tys&&... args)
+                    noexcept((std::is_nothrow_constructible_v<Ts, Tys> && ...))
                     : base_t()
-                { ((this->base_t::template ref<Seqs>() = args), ...); }
+                { (std::construct_at(this->base_t::ptr<Seqs>(), std::forward<Tys>(args)), ...); }
         };
     } // namespace frame_detail
 
@@ -176,9 +171,10 @@ namespace sia
             using base_t = frame_detail::tuple_frame_impl<std::make_index_sequence<sizeof...(Ts)>, Ts...>;
         public:
             constexpr tuple_frame() noexcept = default;
-            constexpr tuple_frame(const Ts&... args) 
-                noexcept((std::is_nothrow_constructible_v<Ts, const Ts&> && ...))
-                : base_t(args...)
+            template <typename... Tys>
+            constexpr tuple_frame(Tys&&... args) 
+                noexcept((std::is_nothrow_constructible_v<Ts, Tys> && ...))
+                : base_t(std::forward<Tys>(args)...)
             { }
 
             // maybe intellisense can't deducing 'frame' type.

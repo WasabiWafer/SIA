@@ -186,7 +186,7 @@ namespace sia
             
             namespace ring_detail
             {
-                enum class ring_object_state { ext_end = 0, ext_begin, emp_end, emp_begin };
+                enum class ring_object_state { ext_end = 0, ext_begin, emp_end, emp_begin, ext_wait, ext_notify, emp_wait, emp_notify };
 
                 template <typename T, size_t Size>
                 struct ring_composition
@@ -219,12 +219,31 @@ namespace sia
                         composition_t& comp = get_composition();
                         return {comp.m_begin->load(std::memory_order::relaxed), comp.m_end->load(std::memory_order::relaxed)};
                     }
-                    constexpr bool state_compare_exchange(size_t at, state_value_t expt, state_value_t desr) noexcept
+                    constexpr bool push_state_begin(size_t at) noexcept
                     {
-                        return (get_composition().m_state.ref() + at)->ref().compare_exchange(expt, desr);
+                        composition_t& comp = get_composition();
+                        state_t& st = (comp.m_state.ref() + at)->ref();
+                        state_value_t begin = state_value_t::ext_begin;
+                        state_value_t end = state_value_t::ext_end;
+                        if (st.compare_exchange(begin, state_value_t::ext_wait))
+                        {
+                            while (!(st.status() == state_value_t::ext_notify)) { }
+                            st.set(state_value_t::emp_begin);
+                            return true;
+                        }
+                        else if (st.compare_exchange(end, state_value_t::emp_begin))
+                        { return true; }
+                        return false;
                     }
-                    constexpr bool state_set(size_t at, state_value_t desr) noexcept
-                    { return (get_composition().m_state.ref() + at)->ref().set(desr); }
+                    constexpr void push_state_end(size_t at) noexcept
+                    {
+                        composition_t& comp = get_composition();
+                        state_t& st = (comp.m_state.ref() + at)->ref();
+                        state_value_t beg = state_value_t::emp_begin;
+                        state_value_t wait = state_value_t::emp_wait;
+                        if (st.compare_exchange(beg, state_value_t::emp_end)) { }
+                        else if (st.compare_exchange(wait, state_value_t::emp_notify)) { }
+                    }
                     constexpr T* address(size_t at) noexcept { return get_composition().m_data.ref() + at;}
                     template <typename... Tys>
                     constexpr void construct_at(T* at, Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Tys...>)
@@ -237,11 +256,10 @@ namespace sia
                         while (!comp.m_begin->compare_exchage(cur, cur.next(), std::memory_order::relaxed, std::memory_order::relaxed))
                         { }
                     }
-                    constexpr void end_counter_inc(ring_counter_t cur) noexcept
+                    constexpr void push_counter_inc(ring_counter_t cur) noexcept
                     {
                         composition_t& comp = get_composition();
-                        while (!comp.m_end->compare_exchage(cur, cur.next(), std::memory_order::relaxed, std::memory_order::relaxed))
-                        { }
+                        while (!comp.m_end->compare_exchange_weak(cur, ring_counter_t{cur.next()}, std::memory_order::relaxed, std::memory_order::relaxed)) { }
                     }
 
                     constexpr size_t size(size_t beg, size_t end) noexcept
@@ -269,7 +287,7 @@ namespace sia
                         composition_t& comp = get_composition();
                         comp.m_state = std::allocator_traits<inner_allocator_type>::allocate(get_inner_allocator(), capacity());
                         for (size_t idx{ }; idx < capacity(); ++idx)
-                        { std::allocator_traits<inner_allocator_type>::construct(get_inner_allocator(), comp.m_state.ptr() + idx); }
+                        { std::allocator_traits<inner_allocator_type>::construct(get_inner_allocator(), comp.m_state.ref() + idx); }
                         comp.m_data = std::allocator_traits<outer_allocator_type>::allocate(get_outer_allocator(), capacity());
                     }
                     
@@ -290,17 +308,17 @@ namespace sia
                         composition_t& comp = get_composition();
                         for (auto pair {get_pair()}; !is_full(pair.first.count(), pair.second.count()); /*null*/)
                         {
-                            if (state_compare_exchange(pair.second.offset(), state_value_t::ext_end, state_value_t::emp_begin))
+                            if (push_state_begin(pair.second.offset()))
                             {
-                                construct_at(pair.second.offset(), std::forward<Tys>(args)...);
-                                state_set(pair.second.offset(), state_value_t::emp_end);
-                                end_counter_inc(pair.second);
+                                construct_at(address(pair.second.offset()), std::forward<Tys>(args)...);
+                                push_state_end(pair.second.offset());
+                                push_counter_inc(pair.second);
                                 return true;
                             }
                             else
                             {
                                 pair.second.inc();
-                                if (is_full(pair.first, pair.second))
+                                if (is_full(pair.first.count(), pair.second.count()))
                                 { pair.first = comp.m_begin->load(std::memory_order::relaxed); }
                             }
                         }
