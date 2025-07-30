@@ -9,11 +9,11 @@
 namespace sia
 {
     template <typename T>
-        requires (type<volatile std::atomic<T>>::is_always_lock_free)
+        requires (std::atomic<T>::is_always_lock_free)
     struct state
     {
         private:
-            using atomic_t = volatile std::atomic<T>;
+            using atomic_t = std::atomic<T>;
             atomic_t m_state;
 
         public:
@@ -41,13 +41,16 @@ namespace sia
                 return *this;
             }
 
-            constexpr T status() const noexcept(noexcept(m_state.load(std::memory_order::relaxed)))
-            { return m_state.load(std::memory_order::relaxed); }
+            constexpr T status() const noexcept(noexcept(m_state.load(std::memory_order::seq_cst)))
+            { return m_state.load(std::memory_order::seq_cst); }
 
-            constexpr void set(T arg) noexcept(noexcept(m_state.store(arg, std::memory_order::relaxed)))
-            { m_state.store(arg, std::memory_order::relaxed); }
+            constexpr void set(T arg) noexcept(noexcept(m_state.store(arg, std::memory_order::seq_cst)))
+            { m_state.store(arg, std::memory_order::seq_cst); }
 
-            constexpr bool compare_exchange(T& expt, T desr) noexcept(noexcept(m_state.compare_exchange_weak(expt, desr, std::memory_order::relaxed, std::memory_order::relaxed)))
-            { return m_state.compare_exchange_weak(expt, desr, std::memory_order::relaxed, std::memory_order::relaxed); }
+            constexpr bool compare_exchange_weak(T& expt, T desr) noexcept(noexcept(m_state.compare_exchange_weak(expt, desr, std::memory_order::seq_cst)))
+            { return m_state.compare_exchange_weak(expt, desr, std::memory_order::seq_cst); }
+
+            constexpr bool compare_exchange_strong(T& expt, T desr) noexcept(noexcept(m_state.compare_exchange_strong(expt, desr, std::memory_order::seq_cst)))
+            { return m_state.compare_exchange_strong(expt, desr, std::memory_order::seq_cst); }
     };
 } // namespace sia
