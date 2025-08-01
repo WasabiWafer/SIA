@@ -50,6 +50,24 @@ namespace sia
                     ret.dec();
                     return ret.count();
                 }
+                constexpr counter_type next_cycle() const noexcept
+                {
+                    counter_type num {this->count()};
+                    counter_type range_check_num = std::numeric_limits<counter_type>::max() - this->adjustment();
+                    if (range_check_num < num)
+                    { return num + Size + adjustment(); }
+                    else
+                    { return num + Size; }
+                }
+                constexpr counter_type prev_cycle() const noexcept
+                {
+                    counter_type num {this->count()};
+                    counter_type range_check_num = std::numeric_limits<counter_type>::min() + this->adjustment();
+                    if (range_check_num > num)
+                    { return num - (Size + adjustment()); }
+                    else
+                    { return num - Size; }
+                }
         };
 
         template <typename T, size_t Size>
