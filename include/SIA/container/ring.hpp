@@ -8,6 +8,9 @@
 
 namespace sia
 {
+    template <typename T, size_t Size, typename Allocator>
+    struct ring;
+
     namespace ring_detail
     {
         template <typename T, T Size>
@@ -150,20 +153,11 @@ namespace sia
             template <typename... Tys>
             constexpr void construct_at(T* at, Tys&&... args) noexcept(std::is_nothrow_constructible_v<T, Tys...>)
             { std::allocator_traits<allocator_type>::construct(get_allocator(), at, std::forward<Tys>(args)...); }
-            
             constexpr void destruct_at(T* at) noexcept(std::is_nothrow_destructible_v<T>)
             { std::allocator_traits<allocator_type>::destroy(get_allocator(), at); }
-            
             constexpr T* address(size_t count) noexcept { return get_composition().m_data + count; }
             
         public:
-            constexpr ~ring() noexcept(std::is_nothrow_destructible_v<T>)
-            {
-                composition_t& comp = get_composition();
-                if (comp.m_data != nullptr)
-                { std::allocator_traits<allocator_type>::deallocate(get_allocator(), comp.m_data, capacity()); }
-            }
-
             constexpr ring(const allocator_type& alloc = allocator_type{ }) 
                 : m_compair(splits::one_v, alloc)
             { get_composition().m_data = std::allocator_traits<allocator_type>::allocate(get_allocator(), capacity()); }
@@ -187,6 +181,13 @@ namespace sia
                 comp.m_end = target_comp.m_end;
             }
 
+            constexpr ~ring() noexcept(std::is_nothrow_destructible_v<T>)
+            {
+                composition_t& comp = get_composition();
+                if (comp.m_data != nullptr)
+                { std::allocator_traits<allocator_type>::deallocate(get_allocator(), comp.m_data, capacity()); }
+            }
+            
             // constexpr ring& operator=(ring& arg) noexcept(std::is_nothrow_constructible_v<T, T&>)
             // constexpr ring& operator=(ring&& arg)
 
