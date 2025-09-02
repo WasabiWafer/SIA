@@ -217,7 +217,7 @@ namespace sia
             constexpr function_pointer() noexcept = default;
             constexpr function_pointer(const function_pointer&) noexcept = default;
             constexpr function_pointer(FuncPtrType ptr) noexcept
-            : m_fp(ptr)
+                : m_fp(ptr)
             { }
             
             constexpr function_pointer& operator=(const function_pointer&) noexcept = default;
@@ -247,7 +247,7 @@ namespace sia
             constexpr function_pointer() noexcept = default;
             constexpr function_pointer(const function_pointer&) noexcept = default;
             constexpr function_pointer(FuncPtrType ptr) noexcept
-            : m_fp(ptr)
+                : m_fp(ptr)
             { }
             
             constexpr function_pointer& operator=(const function_pointer&) noexcept = default;
