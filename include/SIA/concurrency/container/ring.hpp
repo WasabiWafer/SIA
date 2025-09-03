@@ -206,7 +206,6 @@ namespace sia
 
                 struct state_composition
                 {
-                    // true_share<std::atomic<ring_action_state>> m_last_action_state;
                     true_share<state<ring_action_state>> m_last_action_state;
                     true_share<std::atomic<size_t>> m_input_state;
                     true_share<std::atomic<size_t>> m_output_state;
