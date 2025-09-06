@@ -7,6 +7,12 @@
 
 namespace sia
 {    
+    namespace tags
+    {
+        enum class producer { single, multiple };
+        enum class consumer { single, multiple };
+    }
+    
     namespace stamps
     {
         namespace memory_orders
