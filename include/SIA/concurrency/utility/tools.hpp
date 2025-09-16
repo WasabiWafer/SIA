@@ -161,4 +161,75 @@ namespace sia
         else
         { return false; }
     }
+
+    template <typename Func>
+    constexpr bool until_expression_exchange_weak(Func op, auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(atomic.compare_exchange_weak(expect, desire, success_order, failure_order)) && noexcept(op(expect, desire)))
+    {
+        bool ret { };
+        do { ret = atomic.compare_exchange_weak(expect, desire, success_order, failure_order); }
+        while (!ret && op(expect, desire));
+        return ret;
+    }
+
+    template <typename Func>
+    constexpr bool until_expression_exchange_strong(Func op, auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(atomic.compare_exchange_strong(expect, desire, success_order, failure_order)) && noexcept(op(expect, desire)))
+    {
+        bool ret { };
+        do { ret = atomic.compare_exchange_strong(expect, desire, success_order, failure_order); }
+        while (!ret && op(expect, desire));
+        return ret;
+    }
+    
+    // exchg_weak
+    constexpr bool until_equal_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_weak(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_weak(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_not_equal_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_weak(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_weak(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_less_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_weak(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_weak(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_less_equal_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_weak(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_weak(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_greater_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_weak(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_weak(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_greater_equal_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_weak(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_weak(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    // exchg_strong
+    constexpr bool until_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_strong(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_strong(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_not_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_strong(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_strong(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_less_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_strong(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_strong(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_less_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_strong(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_strong(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_greater_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_strong(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_strong(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
+    constexpr bool until_greater_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
+        noexcept(noexcept(until_expression_exchange_strong(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+    { return until_expression_exchange_strong(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
+
 } // namespace sia//
