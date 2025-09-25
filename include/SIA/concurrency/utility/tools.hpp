@@ -166,7 +166,7 @@ namespace sia
     constexpr bool while_expression_exchange_weak(Func op, auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
         noexcept(noexcept(atomic.compare_exchange_weak(expect, desire, success_order, failure_order)) && noexcept(op(expect, desire)))
     {
-        while (op(expect, desire));
+        while (op(expect, desire))
         {
             if (atomic.compare_exchange_weak(expect, desire, success_order, failure_order))
             { return true; }
@@ -178,7 +178,7 @@ namespace sia
     constexpr bool while_expression_exchange_strong(Func op, auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
         noexcept(noexcept(atomic.compare_exchange_strong(expect, desire, success_order, failure_order)) && noexcept(op(expect, desire)))
     {
-        while (op(expect, desire));
+        while (op(expect, desire))
         {
             if (atomic.compare_exchange_strong(expect, desire, success_order, failure_order))
             { return true; }
