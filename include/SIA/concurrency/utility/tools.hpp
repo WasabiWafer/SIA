@@ -235,5 +235,4 @@ namespace sia
     constexpr bool while_greater_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
         noexcept(noexcept(while_expression_exchange_strong(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
     { return while_expression_exchange_strong(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
-
-} // namespace sia//
+} // namespace sia
