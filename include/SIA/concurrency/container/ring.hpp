@@ -270,18 +270,8 @@ namespace sia
                 using composition_type = ring_detail::ring_composition<T, Size, PTag, CTag>;
                 
                 compressed_pair<allocator_type, composition_type> m_compair;
-                
-                constexpr void counter_inc(auto& target_atomic, auto expect, auto desire) noexcept
-                {
-                    constexpr auto less_op = [] (auto lc, auto rc) { return lc.count() < rc.count(); };
-                    bool res { };
-                    while (desire.count() < expect.count())
-                    { res = target_atomic.compare_exchange_weak(expect, desire, std::memory_order::relaxed, std::memory_order::relaxed); }
-                    if (!res)
-                    { while_expression_exchange_weak(less_op, target_atomic, expect, desire, std::memory_order::relaxed, std::memory_order::relaxed); }
-                }
 
-                constexpr void end_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto beg_counter)
+                constexpr void end_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto beg_counter) noexcept
                 {
                     auto less_op =
                         [count = beg_counter.count()] (auto lc, auto rc)
@@ -289,7 +279,7 @@ namespace sia
                     while_expression_exchange_weak(less_op, target_atomic, expect, desire, std::memory_order::relaxed, std::memory_order::relaxed);
                 }
 
-                constexpr void beg_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto end_counter)
+                constexpr void beg_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto end_counter) noexcept
                 {
                     auto greater_op =
                         [count = end_counter.count()] (auto lc, auto rc)
