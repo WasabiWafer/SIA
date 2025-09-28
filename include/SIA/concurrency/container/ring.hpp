@@ -274,7 +274,7 @@ namespace sia
                 constexpr void end_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto beg_counter) noexcept
                 {
                     auto less_op =
-                        [count = beg_counter.count()] (auto lc, auto rc)
+                        [count = beg_counter.count()] (auto lc, auto rc) noexcept
                         { return base_type::size(count, lc.count()) < base_type::size(count, rc.count()); };
                     while_expression_exchange_weak(less_op, target_atomic, expect, desire, std::memory_order::relaxed, std::memory_order::relaxed);
                 }
@@ -282,7 +282,7 @@ namespace sia
                 constexpr void beg_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto end_counter) noexcept
                 {
                     auto greater_op =
-                        [count = end_counter.count()] (auto lc, auto rc)
+                        [count = end_counter.count()] (auto lc, auto rc) noexcept
                         { return base_type::size(lc.count(), count) > base_type::size(rc.count(), count); };
                     while_expression_exchange_weak(greater_op, target_atomic, expect, desire, std::memory_order::relaxed, std::memory_order::relaxed);
                 }
