@@ -30,7 +30,7 @@ namespace sia
             constexpr mutex& operator=(mutex&&) noexcept = delete;
 
             bool try_lock(thread_id_t default_arg = thread_id_t{ }) noexcept
-            { return this->m_owner.compare_exchange_weak(default_arg, this->get_thread_id(), std::memory_order::relaxed, std::memory_order::relaxed); }
+            { return this->m_owner.compare_exchange_strong(default_arg, this->get_thread_id(), std::memory_order::relaxed, std::memory_order::relaxed); }
 
             template <tags::loop LoopTag, tags::wait WaitTag, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
             bool try_lock_loop(LoopTimeType ltt_v = stamps::basis::empty_loop_val, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
