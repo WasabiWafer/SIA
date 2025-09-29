@@ -20,7 +20,13 @@ namespace sia
         template <typename... Ts>
             requires (get_total_size<Ts...>() <= std::hardware_constructive_interference_size)
         struct false_share_impl : align_wrapper<tuple_frame<Ts...>, std::hardware_constructive_interference_size>
-        { };
+        {
+            private:
+                using base_type = align_wrapper<tuple_frame<Ts...>, std::hardware_constructive_interference_size>;
+            public:
+                template <size_t N>
+                constexpr typename auto& get() noexcept { return this->base_type::ref().get<N>(); }
+        };
     } // namespace types_detail
     
     static_assert(std::is_trivially_copyable_v<std::thread::id> && std::is_standard_layout_v<std::thread::id>);
