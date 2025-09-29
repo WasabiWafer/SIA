@@ -137,14 +137,14 @@ namespace sia
                         { return static_cast<derived_type*>(this)->m_end.ref(); }
 
                         template <typename T = void>
-                            requires (requires (derived_type derv) { derv.m_state_composition_data; })
-                        constexpr auto& get_state_composition_data() noexcept
-                        { return static_cast<derived_type*>(this)->m_state_composition_data.ref(); }
+                            requires (requires (derived_type derv) { derv.m_data_entry; })
+                        constexpr auto& get_data() noexcept
+                        { return static_cast<derived_type*>(this)->m_data_entry.get<0>(); }
 
                         template <typename T = void>
-                            requires (requires (derived_type derv) { derv.m_data; })
-                        constexpr auto& get_data() noexcept
-                        { return static_cast<derived_type*>(this)->m_data.ref(); }
+                            requires (requires (derived_type derv) { derv.m_data_entry; })
+                        constexpr auto& get_state_composition_data() noexcept
+                        { return static_cast<derived_type*>(this)->m_data_entry.get<1>(); }
             };
 
             template <typename T, size_t Size, tags::producer PTag, tags::consumer CTag>
@@ -159,7 +159,7 @@ namespace sia
                 public:
                     true_share<base_type::template atomic_type> m_begin;
                     true_share<base_type::template atomic_type> m_end;
-                    true_share<T*> m_data;
+                    false_share<T*> m_data_entry;
             };
 
             template <typename T, size_t Size, tags::producer PTag, tags::consumer CTag>
@@ -171,8 +171,7 @@ namespace sia
                 public:
                     true_share<base_type::template atomic_type> m_begin;
                     true_share<base_type::template atomic_type> m_end;
-                    true_share<base_type::template state_composition_type*> m_state_composition_data;
-                    true_share<T*> m_data;
+                    false_share<T*, base_type::template state_composition_type*> m_data_entry;
             };
 
             template <typename Derived>
