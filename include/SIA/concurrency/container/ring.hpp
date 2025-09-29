@@ -258,9 +258,10 @@ namespace sia
                         )
                     { loop_extract_front<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, arg); }
             };
-        }
+        } // namespace ring_detail
 
         template <typename T, size_t Size, tags::producer PTag = tags::producer::single, tags::consumer CTag = tags::consumer::single, typename Alloc = std::scoped_allocator_adaptor<std::allocator<T>, std::allocator<ring_detail::state_composition<PTag, CTag>>>>
+            requires (Size <= (std::numeric_limits<size_t>::max()/2))
         struct ring : public ring_detail::ring_base<ring<T, Size, PTag, CTag, Alloc>>
         {
             private:
@@ -271,7 +272,7 @@ namespace sia
                 
                 compressed_pair<allocator_type, composition_type> m_compair;
 
-                constexpr void end_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto beg_counter) noexcept
+                static constexpr void end_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto beg_counter) noexcept
                 {
                     auto less_op =
                         [count = beg_counter.count()] (auto lc, auto rc) noexcept
@@ -279,7 +280,7 @@ namespace sia
                     while_expression_exchange_weak(less_op, target_atomic, expect, desire, std::memory_order::relaxed, std::memory_order::relaxed);
                 }
 
-                constexpr void beg_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto end_counter) noexcept
+                static constexpr void beg_atomic_counter_inc(auto& target_atomic, auto expect, auto desire, auto end_counter) noexcept
                 {
                     auto greater_op =
                         [count = end_counter.count()] (auto lc, auto rc) noexcept
