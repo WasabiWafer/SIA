@@ -55,22 +55,18 @@ namespace sia
                 }
                 constexpr counter_type next_cycle() const noexcept
                 {
-                    counter_type num {count()};
-                    counter_type remain_size {std::numeric_limits<counter_type>::max() - num};
-                    if (remain_size < count_number())
-                    { return num + adjustment() + count_number(); }
-                    else
-                    { return num + count_number(); }
+                    counter_type ret {count() + count_number()};
+                    if ((std::numeric_limits<counter_type>::max() - count()) < count_number())
+                    { ret += adjustment(); }
+                    return ret;
                 }
 
                 constexpr counter_type prev_cycle() const noexcept
                 {
-                    counter_type num {count()};
-                    counter_type remain_size {num};
-                    if (remain_size < count_number())
-                    { return num - adjustment() - count_number(); }
-                    else
-                    { return num - count_number(); }
+                    counter_type ret {count() - count_number()};
+                    if (count() < count_number())
+                    { ret -= adjustment(); }
+                    return ret;
                 }
         };
 
