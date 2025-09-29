@@ -19,8 +19,8 @@ namespace sia
                 using counter_type = T;
                 counter_type m_counter;
 
-                static constexpr counter_type adjustment() noexcept
-                { return (std::numeric_limits<counter_type>::max() % Size) + 1; }
+                static constexpr size_t count_number() noexcept { return Size; }
+                static constexpr counter_type adjustment() noexcept { return (std::numeric_limits<counter_type>::max() % count_number()) + 1; }
                 constexpr void inc() noexcept
                 {
                     if (count() == std::numeric_limits<counter_type>::max())
@@ -39,7 +39,7 @@ namespace sia
                 
                 constexpr void add(const counter_type& arg) noexcept { m_counter += arg; }
                 constexpr void sub(const counter_type& arg) noexcept { m_counter -= arg; }
-                constexpr counter_type offset() const noexcept { return m_counter % Size; }
+                constexpr counter_type offset() const noexcept { return m_counter % count_number(); }
                 constexpr counter_type count() const noexcept { return m_counter; }
                 constexpr counter_type next() const noexcept
                 {
@@ -55,21 +55,22 @@ namespace sia
                 }
                 constexpr counter_type next_cycle() const noexcept
                 {
-                    counter_type num {this->count()};
-                    counter_type range_check_num = std::numeric_limits<counter_type>::max() - this->adjustment();
-                    if (range_check_num < num)
-                    { return num + Size + adjustment(); }
+                    counter_type num {count()};
+                    counter_type remain_size {std::numeric_limits<counter_type>::max() - num};
+                    if (remain_size < count_number())
+                    { return num + adjustment() + count_number(); }
                     else
-                    { return num + Size; }
+                    { return num + count_number(); }
                 }
+
                 constexpr counter_type prev_cycle() const noexcept
                 {
-                    counter_type num {this->count()};
-                    counter_type range_check_num = std::numeric_limits<counter_type>::min() + this->adjustment();
-                    if (range_check_num > num)
-                    { return num - (Size + adjustment()); }
+                    counter_type num {count()};
+                    counter_type remain_size {num};
+                    if (remain_size < count_number())
+                    { return num - adjustment() - count_number(); }
                     else
-                    { return num - Size; }
+                    { return num - count_number(); }
                 }
         };
 
