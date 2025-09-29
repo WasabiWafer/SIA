@@ -60,7 +60,6 @@ namespace sia
                     { ret += adjustment(); }
                     return ret;
                 }
-
                 constexpr counter_type prev_cycle() const noexcept
                 {
                     counter_type ret {count() - count_number()};
