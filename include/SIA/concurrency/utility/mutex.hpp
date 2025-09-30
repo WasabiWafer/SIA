@@ -29,20 +29,23 @@ namespace sia
             constexpr mutex(mutex&&) noexcept = delete;
             constexpr mutex& operator=(mutex&&) noexcept = delete;
 
-            bool try_lock(thread_id_t default_arg = thread_id_t{ }) noexcept
-            { return this->m_owner.compare_exchange_strong(default_arg, this->get_thread_id(), std::memory_order::relaxed, std::memory_order::relaxed); }
+            bool try_lock(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            {
+                thread_id_t default_arg { };
+                return this->m_owner.compare_exchange_strong(default_arg, this->get_thread_id(), mem_order, std::memory_order::relaxed);
+            }
 
             template <tags::loop LoopTag, tags::wait WaitTag, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
-            bool try_lock_loop(LoopTimeType ltt_v = stamps::basis::empty_loop_val, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
-            { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, &mutex::try_lock, this, thread_id_t{ }); }
+            bool try_lock_loop(LoopTimeType ltt_v, WaitTimeType wtt_v, std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, &mutex::try_lock, this, mem_order); }
 
-            void lock() noexcept
-            { try_lock_loop<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val); }
+            void lock(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            { try_lock_loop<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, mem_order); }
             
-            void unlock() noexcept
+            void unlock(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
             {
-                if (this->m_owner.load(std::memory_order::relaxed) == this->get_thread_id())
-                { this->m_owner.store(thread_id_t{ }, std::memory_order::relaxed); }
+                thread_id_t tid = stamps::this_thread::id_v;
+                this->m_owner.compare_exchange_strong(tid, thread_id_t{ }, mem_order, std::memory_order::relaxed);
             }
 
             thread_id_t owner() noexcept { return m_owner.load(std::memory_order::relaxed); }
