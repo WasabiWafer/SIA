@@ -328,7 +328,7 @@ namespace sia
                     auto beg_counter = beg.load(std::memory_order::relaxed);
                     auto end_counter = end.load(std::memory_order::relaxed);
                     constexpr auto dck_is_full =
-                        [] (auto& beg_counter, auto end_counter, auto& beg_source)
+                        [] (auto& beg_counter, auto end_counter, auto& beg_source) constexpr noexcept
                         {
                             if (base_type::is_full(beg_counter.count(), end_counter.count()))
                             {
@@ -399,7 +399,7 @@ namespace sia
                     auto beg_counter = beg.load(std::memory_order::relaxed);
                     auto end_counter = end.load(std::memory_order::relaxed);
                     constexpr auto dck_is_empty =
-                        [] (auto beg_counter, auto& end_counter, auto& end_source)
+                        [] (auto beg_counter, auto& end_counter, auto& end_source) constexpr noexcept
                         {
                             if (base_type::is_empty(beg_counter.count(), end_counter.count()))
                             {
