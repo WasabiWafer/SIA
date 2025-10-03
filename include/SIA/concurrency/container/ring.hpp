@@ -139,12 +139,12 @@ namespace sia
                         template <typename T = void>
                             requires (requires (derived_type derv) { derv.m_data_entry; })
                         constexpr auto& get_data() noexcept
-                        { return static_cast<derived_type*>(this)->m_data_entry.get<0>(); }
+                        { return static_cast<derived_type*>(this)->m_data_entry.ref<0>(); }
 
                         template <typename T = void>
                             requires (requires (derived_type derv) { derv.m_data_entry; })
                         constexpr auto& get_state_composition_data() noexcept
-                        { return static_cast<derived_type*>(this)->m_data_entry.get<1>(); }
+                        { return static_cast<derived_type*>(this)->m_data_entry.ref<1>(); }
             };
 
             template <typename T, size_t Size, tags::producer PTag, tags::consumer CTag>
