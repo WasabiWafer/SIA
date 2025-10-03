@@ -25,7 +25,9 @@ namespace sia
                 using base_type = align_wrapper<tuple_frame<Ts...>, std::hardware_constructive_interference_size>;
             public:
                 template <size_t N>
-                constexpr typename auto& get() noexcept { return this->base_type::ref().get<N>(); }
+                constexpr typename auto ptr() noexcept { return this->base_type::ref().ptr<N>(); }
+                template <size_t N>
+                constexpr typename auto& ref() noexcept { return this->base_type::ref().ref<N>(); }
         };
     } // namespace types_detail
     
