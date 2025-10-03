@@ -34,7 +34,8 @@ namespace sia
     namespace tools_detail
     {
         template <tags::wait Tag, typename TimeType = default_time_rep_t>
-        consteval bool is_wait_nothrow(TimeType time = stamps::basis::empty_wait_val) noexcept
+        // consteval bool is_wait_nothrow(TimeType time = stamps::basis::empty_wait_val) noexcept
+        consteval bool is_wait_nothrow(TimeType time = TimeType{ }) noexcept
         {
             if constexpr (Tag == tags::wait::busy)
             { return true; }
