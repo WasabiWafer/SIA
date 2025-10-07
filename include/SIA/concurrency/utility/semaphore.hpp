@@ -4,62 +4,50 @@
 #include <atomic>
 
 #include "SIA/internals/types.hpp"
-#include "SIA/concurrency/internals/types.hpp"
-#include "SIA/concurrency/internals/define.hpp"
-#include "SIA/utility/tools.hpp"
 #include "SIA/concurrency/utility/tools.hpp"
-#include "SIA/utility/recorder.hpp"
 
 namespace sia
 {
-    template <typename ValueType = largest_unsigned_integer_t, ValueType Limit = std::numeric_limits<ValueType>::max()>
+    template <typename T = largest_unsigned_integer_t, T Limit = std::numeric_limits<T>::max()>
+        requires (std::atomic<T>::is_always_lock_free)
     struct semaphore
     {
         private:
-            using value_type = ValueType;
+            using value_type = T;
             using atomic_type = std::atomic<value_type>;
-
+            
             atomic_type m_count;
 
-            static constexpr value_type num_step() noexcept { return value_type(1); }
-
+            static constexpr value_type step() noexcept { return value_type{1}; }
         public:
             constexpr semaphore(value_type init = Limit) noexcept
                 : m_count(init)
-            { static_assert(atomic_type::is_always_lock_free); }
+            { }
 
             semaphore(const semaphore&) = delete;
             semaphore(semaphore&&) = delete;
-            semaphore& operator=(const semaphore&) = delete
+            semaphore& operator=(const semaphore&) = delete;
             semaphore& operator=(semaphore&&) = delete;
 
-            constexpr bool try_acquire() noexcept
+            constexpr bool try_acquire(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept
             {
-                constexpr auto acq = std::memory_order::acquire;
-                constexpr auto rle = std::memory_order::release;
-
-                value_type cur = this->m_count.load(acq);
-                if (cur != 0)
+                value_type tmp = m_count.load(std::memory_order::relaxed);
+                while (tmp != value_type{0})
                 {
-                    while (!this->m_count.compare_exchange_weak(cur, cur - this->num_step(), rle, acq))
-                    {
-                        if (cur == 0)
-                        { return false; }
-                    }
-                    return true;
+                    if (m_count.compare_exchange_weak(tmp, tmp - step(), rmw_mem_order, load_mem_order))
+                    { return true; }
                 }
-                else
-                { return false; }
+                return false;
             }
 
-            template <tags::loop LoopTag = tags::loop::busy, tags::wait WaitTag = tags::wait::busy, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
-            constexpr bool try_acquire_loop(LoopTimeType ltt_v = stamps::basis::empty_loop_val, WaitTimeType wtt_v = stamps::basis::empty_wait_val) noexcept
-            { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, static_cast<bool(semaphore::*)()>(&semaphore::try_acquire), this); }
+            template <tags::loop LoopTag, tags::wait WaitTag, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
+            constexpr bool try_acquire_loop(LoopTimeType ltt_v, WaitTimeType wtt_v, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept
+            { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, &semaphore::try_acquire, this, rmw_mem_order, load_mem_order); }
 
-            constexpr void acquire() noexcept
-            { try_acquire_loop<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val); }
+            constexpr void acquire(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept
+            { try_acquire_loop<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
 
-            constexpr void release() noexcept
-            { this->m_count.fetch_add(this->num_step(), std::memory_order::relaxed); }
+            constexpr value_type release(std::memory_order mem_order) noexcept
+            { return m_count.fetch_add(step(), mem_order); }
     };
 } // namespace sia
