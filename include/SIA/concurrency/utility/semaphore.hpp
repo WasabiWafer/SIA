@@ -16,18 +16,17 @@ namespace sia
     struct semaphore
     {
         private:
-            using self_t = semaphore;
-            using value_t = ValueType;
-            using atomic_t = std::atomic<value_t>;
+            using value_type = ValueType;
+            using atomic_type = std::atomic<value_type>;
 
-            atomic_t m_count;
+            atomic_type m_count;
 
-            static constexpr value_t num_step() noexcept { return value_t(1); }
+            static constexpr value_type num_step() noexcept { return value_type(1); }
 
         public:
-            constexpr semaphore(value_t init = Limit) noexcept
+            constexpr semaphore(value_type init = Limit) noexcept
                 : m_count(init)
-            { static_assert(atomic_t::is_always_lock_free); }
+            { static_assert(atomic_type::is_always_lock_free); }
 
             semaphore(const semaphore&) = delete;
             semaphore(semaphore&&) = delete;
@@ -39,7 +38,7 @@ namespace sia
                 constexpr auto acq = std::memory_order::acquire;
                 constexpr auto rle = std::memory_order::release;
 
-                value_t cur = this->m_count.load(acq);
+                value_type cur = this->m_count.load(acq);
                 if (cur != 0)
                 {
                     while (!this->m_count.compare_exchange_weak(cur, cur - this->num_step(), rle, acq))

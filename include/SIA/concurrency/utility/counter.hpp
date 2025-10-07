@@ -14,45 +14,50 @@ namespace sia
         struct counter
         {
             private:
-                using atomic_type = std::atomic<T>;
+                using value_type = T;
+                using atomic_type = std::atomic<value_type>;
 
                 atomic_type m_atomic;
 
-                static constexpr T step() noexcept { return Step; }
-                constexpr bool try_expression_step(auto func, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                static constexpr value_type step() noexcept { return Step; }
+
+            public:
+                constexpr value_type count(std::memory_order mem_order) noexcept { return m_atomic.load(mem_order); }
+
+                template <tags::wait WaitTag>
+                constexpr bool try_gradual_expression_step(auto func, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
                 {
-                    T tmp {count(std::memory_order::relaxed)};
+                    value_type tmp {count(std::memory_order::relaxed)};
                     return m_atomic.compare_exchange_strong(tmp, func(tmp, step()), rmw_mem_order, load_mem_order);
                 }
 
                 template <tags::wait WaitTag>
-                constexpr void expression_step(auto func, auto wtt_v, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                constexpr void gradual_expression_step(auto func, auto wtt_v, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
                 {
-                    T tmp {count(std::memory_order::relaxed)};
+                    value_type tmp {count(std::memory_order::relaxed)};
                     while(!m_atomic.compare_exchange_weak(tmp, func(tmp, step()), rmw_mem_order, load_mem_order))
                     { wait<WaitTag>(wtt_v); }
                 }
-
-            public:
-                constexpr T count(std::memory_order mem_order) noexcept { return m_atomic.load(mem_order); }
-                constexpr bool try_inc(std::memory_order rmw_mem_order, std::memory_order load_mem_order = std::memory_order::relaxed) noexcept(std::is_nothrow_constructible_v<T, T>)
-                { return try_expression_step(std::plus{ }, rmw_mem_order, load_mem_order); }
-                constexpr bool try_dec(std::memory_order rmw_mem_order, std::memory_order load_mem_order = std::memory_order::relaxed) noexcept(std::is_nothrow_constructible_v<T, T>)
-                { return try_expression_step(std::minus{ }, rmw_mem_order, load_mem_order); }
                 
-                template <tags::wait WaitTag = tags::wait::busy>
-                constexpr void inc(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
-                { expression_step<WaitTag>(std::plus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
-                template <tags::wait WaitTag = tags::wait::busy>
-                constexpr void dec(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
-                { expression_step<WaitTag>(std::minus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
+                constexpr bool try_gradual_inc(std::memory_order mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                { return try_gradual_expression_step(std::plus{ }, mem_order, std::memory_order::relaxed); }
+                constexpr bool try_gradual_dec(std::memory_order mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                { return try_gradual_expression_step(std::minus{ }, mem_order, std::memory_order::relaxed); }
+                
+                constexpr bool gradual_inc(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                { gradual_expression_step<tags::wait::busy>(std::plus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
+                constexpr bool gradual_dec(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                { gradual_expression_step<tags::wait::busy>(std::plus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
 
-                template <tags::wait WaitTag = tags::wait::busy>
-                constexpr void inc(auto wtt_v, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
-                { expression_step<WaitTag>(std::plus{ }, wtt_v, rmw_mem_order, load_mem_order); }
-                template <tags::wait WaitTag = tags::wait::busy>
-                constexpr void dec(auto wtt_v, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
-                { expression_step<WaitTag>(std::minus{ }, wtt_v, rmw_mem_order, load_mem_order); }
+                constexpr value_type inc(std::memory_order mem_order) noexcept
+                { return m_atomic.fetch_add(step(), mem_order); }
+                constexpr value_type dec(std::memory_order mem_order) noexcept
+                { return m_atomic.fetch_sub(step(), mem_order); }
+                
+                constexpr value_type add(value_type amount, std::memory_order mem_order) noexcept
+                { return m_atomic.fetch_add(amount, mem_order); }
+                constexpr value_type sub(value_type amount, std::memory_order mem_order) noexcept
+                { return m_atomic.fetch_sub(amount, mem_order); }
         };
     } // namespace concurrency
 } // namespace sia

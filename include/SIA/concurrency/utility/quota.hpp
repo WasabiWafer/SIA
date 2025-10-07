@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <atomic>
 
 namespace sia
 {
@@ -8,6 +9,46 @@ namespace sia
     {
         enum class quota { take, try_take, have };
     } // namespace tags
+
+    namespace wip
+    {
+        namespace quota_detail
+        {
+            template <typename T>
+            concept LockAble = requires (T arg) { arg.lock(); arg.unlock(); arg.try_lock(); };
+            template <typename T>
+            concept AcquireAble = requires (T arg) { arg.acquire(); arg.release(); arg.try_acquire(); };
+            template <typename T>
+            concept QuotaAble = LockAble<T> || AcquireAble<T>;
+
+            enum class quota_type { lock_type, acquire_type };
+            
+
+            template <typename T>
+            constexpr quota_type get_quota_type() noexcept
+            {
+                if constexpr (LockAble<T>)
+                { return quota_type::lock_type; }
+                else if constexpr (AcquireAble<T>)
+                { return quota_type::acquire_type; }
+            }
+        } // namespace quota_detail
+        
+        template <quota_detail::QuotaAble T>
+        struct quota
+        {
+            T& m_target;
+
+            constexpr bool try_take(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            {
+                if constexpr (quota_detail::LockAble<T>)
+                { return m_target.try_lock(mem_order); }
+                else if constexpr (quota_detail::AcquireAble<T>)
+                { }
+            }
+        };
+    } // namespace wip
+    
     
     namespace quota_detail
     {
