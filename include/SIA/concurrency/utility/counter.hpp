@@ -27,14 +27,14 @@ namespace sia
                 template <tags::wait WaitTag>
                 constexpr bool try_gradual_expression_step(auto func, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
                 {
-                    value_type tmp {count(std::memory_order::relaxed)};
+                    value_type tmp {count(load_mem_order)};
                     return m_atomic.compare_exchange_strong(tmp, func(tmp, step()), rmw_mem_order, load_mem_order);
                 }
 
                 template <tags::wait WaitTag>
                 constexpr void gradual_expression_step(auto func, auto wtt_v, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
                 {
-                    value_type tmp {count(std::memory_order::relaxed)};
+                    value_type tmp {count(load_mem_order)};
                     while(!m_atomic.compare_exchange_weak(tmp, func(tmp, step()), rmw_mem_order, load_mem_order))
                     { wait<WaitTag>(wtt_v); }
                 }
