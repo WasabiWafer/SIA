@@ -11,7 +11,7 @@ namespace sia
     {
         enum class producer { single, multiple };
         enum class consumer { single, multiple };
-    }
+    } // namespace tags
     
     namespace stamps
     {
