@@ -44,10 +44,10 @@ namespace sia
                 constexpr bool try_gradual_dec(std::memory_order mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
                 { return try_gradual_expression_step(std::minus{ }, mem_order, std::memory_order::relaxed); }
                 
-                constexpr bool gradual_inc(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                constexpr void gradual_inc(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
                 { gradual_expression_step<tags::wait::busy>(std::plus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
-                constexpr bool gradual_dec(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
-                { gradual_expression_step<tags::wait::busy>(std::plus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
+                constexpr void gradual_dec(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                { gradual_expression_step<tags::wait::busy>(std::minus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
 
                 constexpr value_type inc(std::memory_order mem_order) noexcept
                 { return m_atomic.fetch_add(step(), mem_order); }
