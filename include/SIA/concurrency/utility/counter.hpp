@@ -24,39 +24,42 @@ namespace sia
             public:
                 constexpr value_type count(std::memory_order mem_order = std::memory_order::seq_cst) noexcept { return m_atomic.load(mem_order); }
 
-                template <tags::wait WaitTag>
-                constexpr bool try_gradual_expression_step(auto func, std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst) noexcept(std::is_nothrow_constructible_v<T, T>)
+                constexpr bool try_gradual_expression_step(auto func, std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst)
+                    noexcept(std::is_nothrow_constructible_v<T, T>)
                 {
                     value_type tmp {count(load_mem_order)};
                     return m_atomic.compare_exchange_strong(tmp, func(tmp, step()), rmw_mem_order, load_mem_order);
                 }
 
                 template <tags::wait WaitTag>
-                constexpr void gradual_expression_step(auto func, auto wtt_v, std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst) noexcept(std::is_nothrow_constructible_v<T, T>)
+                constexpr void gradual_expression_step(auto func, auto wtt_v, std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst)
+                    noexcept(std::is_nothrow_constructible_v<T, T>)
                 {
                     value_type tmp {count(load_mem_order)};
                     while(!m_atomic.compare_exchange_weak(tmp, func(tmp, step()), rmw_mem_order, load_mem_order))
                     { wait<WaitTag>(wtt_v); }
                 }
                 
-                constexpr bool try_gradual_inc(std::memory_order mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                constexpr bool try_gradual_inc(std::memory_order mem_order = std::memory_order::seq_cst) noexcept(std::is_nothrow_constructible_v<T, T>)
                 { return try_gradual_expression_step(std::plus{ }, mem_order, std::memory_order::relaxed); }
-                constexpr bool try_gradual_dec(std::memory_order mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                constexpr bool try_gradual_dec(std::memory_order mem_order = std::memory_order::seq_cst) noexcept(std::is_nothrow_constructible_v<T, T>)
                 { return try_gradual_expression_step(std::minus{ }, mem_order, std::memory_order::relaxed); }
                 
-                constexpr void gradual_inc(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                constexpr void gradual_inc(std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst)
+                    noexcept(std::is_nothrow_constructible_v<T, T>)
                 { gradual_expression_step<tags::wait::busy>(std::plus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
-                constexpr void gradual_dec(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept(std::is_nothrow_constructible_v<T, T>)
+                constexpr void gradual_dec(std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst)
+                    noexcept(std::is_nothrow_constructible_v<T, T>)
                 { gradual_expression_step<tags::wait::busy>(std::minus{ }, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
 
-                constexpr value_type inc(std::memory_order mem_order) noexcept
+                constexpr value_type inc(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
                 { return m_atomic.fetch_add(step(), mem_order); }
-                constexpr value_type dec(std::memory_order mem_order) noexcept
+                constexpr value_type dec(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
                 { return m_atomic.fetch_sub(step(), mem_order); }
                 
-                constexpr value_type add(value_type amount, std::memory_order mem_order) noexcept
+                constexpr value_type add(value_type amount, std::memory_order mem_order = std::memory_order::seq_cst) noexcept
                 { return m_atomic.fetch_add(amount, mem_order); }
-                constexpr value_type sub(value_type amount, std::memory_order mem_order) noexcept
+                constexpr value_type sub(value_type amount, std::memory_order mem_order = std::memory_order::seq_cst) noexcept
                 { return m_atomic.fetch_sub(amount, mem_order); }
         };
     } // namespace concurrency
