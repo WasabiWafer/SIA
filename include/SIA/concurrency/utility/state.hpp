@@ -29,28 +29,28 @@ namespace sia
                 : m_state(arg.status())
             { }
 
-            constexpr state& operator=(T arg) noexcept(noexcept(this->set(arg)))
+            constexpr state& operator=(T arg) noexcept
             {
                 this->set(arg);
                 return *this;
             }
 
-            constexpr state& operator=(const state& arg) noexcept(noexcept(this->set(arg.status())))
+            constexpr state& operator=(const state& arg) noexcept
             {
                 this->set(arg.status());
                 return *this;
             }
 
-            constexpr T status() const noexcept(noexcept(m_state.load(std::memory_order::seq_cst)))
+            constexpr T status() const noexcept
             { return m_state.load(std::memory_order::seq_cst); }
 
-            constexpr void set(T arg) noexcept(noexcept(m_state.store(arg, std::memory_order::seq_cst)))
+            constexpr void set(T arg) noexcept
             { m_state.store(arg, std::memory_order::seq_cst); }
 
-            constexpr bool compare_exchange_weak(T& expt, T desr) noexcept(noexcept(m_state.compare_exchange_weak(expt, desr, std::memory_order::seq_cst)))
+            constexpr bool compare_exchange_weak(T& expt, T desr) noexcept
             { return m_state.compare_exchange_weak(expt, desr, std::memory_order::seq_cst); }
 
-            constexpr bool compare_exchange_strong(T& expt, T desr) noexcept(noexcept(m_state.compare_exchange_strong(expt, desr, std::memory_order::seq_cst)))
+            constexpr bool compare_exchange_strong(T& expt, T desr) noexcept
             { return m_state.compare_exchange_strong(expt, desr, std::memory_order::seq_cst); }
     };
 } // namespace sia
