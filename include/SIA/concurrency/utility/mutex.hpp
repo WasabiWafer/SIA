@@ -48,12 +48,12 @@ namespace sia
                 this->m_owner.compare_exchange_strong(tid, thread_id_t{ }, mem_order, std::memory_order::relaxed);
             }
 
-            thread_id_t owner() noexcept { return m_owner.load(std::memory_order::relaxed); }
+            thread_id_t owner(std::memory_order mem_order = std::memory_order::seq_cst) noexcept { return m_owner.load(mem_order); }
 
-            void force_lock() noexcept
-            { this->m_owner.store(this->get_thread_id(), std::memory_order::relaxed); }
+            void force_lock(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            { this->m_owner.store(this->get_thread_id(), mem_order); }
 
-            void force_unlock() noexcept
-            { this->m_owner.store(thread_id_t{ }, std::memory_order::relaxed); }
+            void force_unlock(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            { this->m_owner.store(thread_id_t{ }, mem_order); }
     };
 } // namespace sia
