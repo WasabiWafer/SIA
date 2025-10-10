@@ -29,9 +29,9 @@ namespace sia
             semaphore& operator=(const semaphore&) = delete;
             semaphore& operator=(semaphore&&) = delete;
 
-            constexpr bool try_acquire(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept
+            constexpr bool try_acquire(std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst) noexcept
             {
-                value_type tmp = m_count.load(std::memory_order::relaxed);
+                value_type tmp = m_count.load(load_mem_order);
                 while (tmp != value_type{0})
                 {
                     if (m_count.compare_exchange_weak(tmp, tmp - step(), rmw_mem_order, load_mem_order))
@@ -41,13 +41,13 @@ namespace sia
             }
 
             template <tags::loop LoopTag, tags::wait WaitTag, typename LoopTimeType = default_time_rep_t, typename WaitTimeType = default_time_rep_t>
-            constexpr bool try_acquire_loop(LoopTimeType ltt_v, WaitTimeType wtt_v, std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept
+            constexpr bool try_acquire_loop(LoopTimeType ltt_v, WaitTimeType wtt_v, std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst) noexcept
             { return loop<LoopTag, WaitTag>(true, ltt_v, wtt_v, &semaphore::try_acquire, this, rmw_mem_order, load_mem_order); }
 
-            constexpr void acquire(std::memory_order rmw_mem_order, std::memory_order load_mem_order) noexcept
+            constexpr void acquire(std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst) noexcept
             { try_acquire_loop<tags::loop::busy, tags::wait::busy>(stamps::basis::empty_loop_val, stamps::basis::empty_wait_val, rmw_mem_order, load_mem_order); }
 
-            constexpr value_type release(std::memory_order mem_order) noexcept
+            constexpr value_type release(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
             { return m_count.fetch_add(step(), mem_order); }
     };
 } // namespace sia
