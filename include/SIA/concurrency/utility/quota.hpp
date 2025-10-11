@@ -10,161 +10,80 @@ namespace sia
         enum class quota { take, try_take, have };
     } // namespace tags
 
-    namespace wip
-    {
-        namespace quota_detail
-        {
-            template <typename T>
-            concept LockAble = requires (T arg) { arg.lock(); arg.unlock(); arg.try_lock(); };
-            template <typename T>
-            concept AcquireAble = requires (T arg) { arg.acquire(); arg.release(); arg.try_acquire(); };
-            template <typename T>
-            concept QuotaAble = LockAble<T> || AcquireAble<T>;
-
-            enum class quota_type { lock_type, acquire_type };
-            
-
-            template <typename T>
-            constexpr quota_type get_quota_type() noexcept
-            {
-                if constexpr (LockAble<T>)
-                { return quota_type::lock_type; }
-                else if constexpr (AcquireAble<T>)
-                { return quota_type::acquire_type; }
-            }
-        } // namespace quota_detail
-        
-        template <quota_detail::QuotaAble T>
-        struct quota
-        {
-            T& m_target;
-
-            constexpr bool try_take(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
-            {
-                if constexpr (quota_detail::LockAble<T>)
-                { return m_target.try_lock(mem_order); }
-                else if constexpr (quota_detail::AcquireAble<T>)
-                { }
-            }
-        };
-    } // namespace wip
-    
-    
     namespace quota_detail
     {
         template <typename T>
-        concept LockAble = requires (T arg) { arg.lock(); arg.unlock(); };
+        concept LockAble = requires (T arg) { arg.lock(); arg.unlock(); arg.try_lock(); };
         template <typename T>
-        concept AcquireAble = requires (T arg) { arg.acquire(); arg.release(); };
+        concept AcquireAble = requires (T arg) { arg.acquire(); arg.release(); arg.try_acquire(); };
         template <typename T>
-        concept QuotaReq = LockAble<T> || AcquireAble<T>;
+        concept QuotaAble = LockAble<T> || AcquireAble<T>;
 
         template <typename T>
-        consteval bool is_in_nothrow() noexcept
+        struct quota_base;
+
+        template <LockAble T>
+        struct quota_base<T>
         {
-            if constexpr (LockAble<T>)
-            { return noexcept(T().lock()); }
-            else if constexpr (AcquireAble<T>)
-            { return noexcept(T().acquire()); }
-            else
-            { return false; }
-        }
+            template <typename>
+            friend class quota;
+            T& m_target;
+            constexpr bool try_take(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            { return m_target.try_lock(mem_order); }
+            constexpr void take(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            { m_target.lock(mem_order); }
+            constexpr void back(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            { m_target.unlock(mem_order); }
+            constexpr bool is_own(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
+            { m_target.is_own(mem_order); }
+        };
 
-        template <typename T>
-        consteval bool is_out_nothrow() noexcept
+        template <AcquireAble T>
+        struct quota_base<T>
         {
-            if constexpr (LockAble<T>)
-            { return noexcept(T().unlock()); }
-            else if constexpr (AcquireAble<T>)
-            { return noexcept(T().release()); }
-            else
-            { return false; }
-        }
-    } // namespace quota_detail
-
-    template <quota_detail::QuotaReq T>
-    struct quota
-    {
-        private:
-            using type = quota;
+            template <typename>
+            friend class quota;
             T& m_target;
             bool m_own;
-
-            constexpr void in() noexcept(quota_detail::is_in_nothrow<T>())
+            constexpr bool try_take(std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst) noexcept
+            { return m_own = m_target.try_acquire(rmw_mem_order, load_mem_order); }
+            constexpr void take(std::memory_order rmw_mem_order = std::memory_order::seq_cst, std::memory_order load_mem_order = std::memory_order::seq_cst) noexcept
             {
-                if constexpr (quota_detail::LockAble<T>)
-                { this->m_target.lock(); }
-                else if constexpr (quota_detail::AcquireAble<T>)
-                { this->m_target.acquire(); }
-                else
-                { }
-                this->m_own = true;
+                m_target.acquire(rmw_mem_order, load_mem_order);
+                m_own = true;
             }
-
-            constexpr void try_in() noexcept(quota_detail::is_in_nothrow<T>())
+            constexpr void back(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
             {
-                if constexpr (quota_detail::LockAble<T>)
-                { this->m_own = this->m_target.try_lock(); }
-                else if constexpr (quota_detail::AcquireAble<T>)
-                { this->m_own = this->m_target.try_acquire(); }
-                else
-                { }
+                m_target.release(mem_order);
+                m_own = false;
             }
-            
-            constexpr void out() noexcept(quota_detail::is_out_nothrow<T>())
-            {
-                if constexpr (quota_detail::LockAble<T>)
-                { this->m_target.unlock(); }
-                else if constexpr (quota_detail::AcquireAble<T>)
-                { this->m_target.release(); }
-                else
-                { }
-                this->m_own = false;
-            }
-
-            constexpr void proc_tag(const tags::quota& tag) noexcept(quota_detail::is_in_nothrow<T>())
-            {
-                if (tag == tags::quota::take)
-                { this->in(); }
-                else if (tag == tags::quota::try_take)
-                { this->try_in(); }
-                else if (tag == tags::quota::have)
-                { this->m_own = true; }
-                else
-                { }
-            }
-
-        public:
-            constexpr quota(T& arg, tags::quota tag = tags::quota::take) noexcept(quota_detail::is_in_nothrow<T>())
-                : m_target(arg), m_own(false)
-            { this->proc_tag(tag); }
-
-            ~quota() noexcept(quota_detail::is_out_nothrow<T>())
-            { this->back(); }
-
             constexpr bool is_own() noexcept
-            { return this->m_own; }
+            { return m_own; }
+        };
+    } // namespace quota_detail
 
-            constexpr void take() noexcept(quota_detail::is_in_nothrow<T>())
+    template <quota_detail::QuotaAble T>
+    struct quota : private quota_detail::quota_base<T>
+    {
+        private:
+            using base_type = quota_detail::quota_base<T>;
+        public:
+            constexpr quota(auto& arg, tags::quota qtag = tags::quota::take) noexcept
+                : base_type(arg)
             {
-                if (!this->is_own())
-                { this->proc_tag(tags::quota::take); }
+                if (qtag == tags::quota::take)
+                { base_type::take(); }
+                else if (qtag == tags::quota::try_take)
+                { base_type::try_take(); }
+                else if (qtag == tags::quota::have)
+                {
+                    if constexpr (quota_detail::AcquireAble<T>)
+                    { base_type::m_own = true; }
+                }
             }
-
-            constexpr bool try_take() noexcept(quota_detail::is_in_nothrow<T>())
-            {
-                if (!this->is_own())
-                { this->proc_tag(tags::quota::try_take); }
-                return this->is_own();
-            }
-
-            constexpr void back() noexcept(quota_detail::is_out_nothrow<T>())
-            {
-                if (this->is_own())
-                { this->out(); }
-            }
+            constexpr ~quota() noexcept { base_type::back(); }
     };
 
-    template <quota_detail::QuotaReq T>
-    quota(T&& arg, tags::quota tag = tags::quota::take) -> quota<std::remove_reference_t<T>>;
+    template <typename T>
+    quota(T&& arg) -> quota<std::remove_reference_t<T>>;
 } // namespace sia

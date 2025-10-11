@@ -1,10 +1,7 @@
 #pragma once
 
-#include <thread>
 #include <atomic>
 
-#include "SIA/utility/tools.hpp"
-#include "SIA/utility/recorder.hpp"
 #include "SIA/concurrency/internals/types.hpp"
 #include "SIA/concurrency/internals/define.hpp"
 #include "SIA/concurrency/utility/tools.hpp"
@@ -49,7 +46,7 @@ namespace sia
             }
 
             thread_id_t owner(std::memory_order mem_order = std::memory_order::seq_cst) noexcept { return m_owner.load(mem_order); }
-            constexpr bool is_own(std::memory_order mem_order = std::memory_order::seq_cst) noexcept { return owner(mem_order) == stamps::this_thread::id_v; }
+            bool is_own(std::memory_order mem_order = std::memory_order::seq_cst) noexcept { return owner(mem_order) == stamps::this_thread::id_v; }
 
             void force_lock(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
             { this->m_owner.store(this->get_thread_id(), mem_order); }
