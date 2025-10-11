@@ -54,8 +54,11 @@ namespace sia
             }
             constexpr void back(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
             {
-                m_target.release(mem_order);
-                m_own = false;
+                if (is_own())
+                {
+                    m_target.release(mem_order);
+                    m_own = false;
+                }
             }
             constexpr bool is_own() noexcept
             { return m_own; }
