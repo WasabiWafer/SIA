@@ -189,51 +189,51 @@ namespace sia
     
     // exchg_weak
     constexpr bool while_equal_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_weak(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_weak(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_not_equal_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_weak(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_weak(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_less_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_weak(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_weak(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_less_equal_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_weak(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_weak(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_greater_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_weak(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_weak(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_greater_equal_exchange_weak(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_weak(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_weak(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     // exchg_strong
     constexpr bool while_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_strong(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_strong(std::equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_not_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_strong(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_strong(std::not_equal_to<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_less_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_strong(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_strong(std::less<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_less_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_strong(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_strong(std::less_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_greater_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_strong(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_strong(std::greater<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 
     constexpr bool while_greater_equal_exchange_strong(auto&& atomic, auto&& expect, auto desire, std::memory_order success_order, std::memory_order failure_order)
-        noexcept(noexcept(while_expression_exchange_strong(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order)))
+        noexcept(noexcept(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }(expect, desire)))
     { return while_expression_exchange_strong(std::greater_equal<std::remove_reference_t<decltype(atomic)>::template value_type>{ }, atomic, expect, desire, success_order, failure_order); }
 } // namespace sia
