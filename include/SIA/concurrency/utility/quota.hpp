@@ -35,7 +35,7 @@ namespace sia
             constexpr void back(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
             { m_target.unlock(mem_order); }
             constexpr bool is_own(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
-            { m_target.is_own(mem_order); }
+            { return m_target.is_own(mem_order); }
         };
 
         template <AcquireAble T>
@@ -54,11 +54,8 @@ namespace sia
             }
             constexpr void back(std::memory_order mem_order = std::memory_order::seq_cst) noexcept
             {
-                if (is_own())
-                {
-                    m_target.release(mem_order);
-                    m_own = false;
-                }
+                m_target.release(mem_order);
+                m_own = false;
             }
             constexpr bool is_own() noexcept
             { return m_own; }
@@ -84,7 +81,11 @@ namespace sia
                     { base_type::m_own = true; }
                 }
             }
-            constexpr ~quota() noexcept { base_type::back(); }
+            constexpr ~quota() noexcept
+            {
+                if (base_type::is_own())
+                { base_type::back(); }
+            }
     };
 
     template <typename T>
