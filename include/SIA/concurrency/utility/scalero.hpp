@@ -27,4 +27,6 @@ namespace sia
                 return tmp;
             }
     };
+
+    using lever = scalero<size_t, 2>;
 } // namespace sia
